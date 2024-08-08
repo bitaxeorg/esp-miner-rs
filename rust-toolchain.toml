@@ -1,4 +1,2 @@
 [toolchain]
 channel = "esp"
-components = ["rustfmt", "rustc-dev"]
-targets = ["xtensa-esp32s3-none-elf"]
