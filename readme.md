@@ -22,3 +22,6 @@ and more to come.
 `cargo build --release` (dev profile can potentially be one or more orders of magnitude
   slower than release, and may cause issues with timing-senstive
   peripherals and/or devices of `esp-hal`)
+
+## Flash and Run
+`SSID="my_ssid" PASSWORD="my_password" cargo build --release`
