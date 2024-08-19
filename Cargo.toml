@@ -11,24 +11,26 @@ keywords = ["embedded", "embedded-hal", "esp", "esp32s3", "no-std"]
 categories = ["embedded", "no-std", "bitcoin"]
 
 [dependencies]
+defmt = "0.3.8"
 embassy-executor = { version = "0.5.0", features = ["task-arena-size-40960"] }
 embassy-futures = "0.1.1"
-embassy-net = { version = "0.4.0", features = [ "tcp", "udp", "dhcpv4", "medium-ethernet"] }
+embassy-net = { version = "0.4.0", features = [ "defmt", "dhcpv4", "medium-ethernet", "tcp", "udp"] }
 embassy-sync = "0.6.0"
 embassy-time = { version = "0.3.1", features = ["generic-queue-8"] }
 embedded-io = "0.6.1"
 embedded-io-async = "0.6.1"
 esp-backtrace = { version = "0.13.0", features = [
+    "defmt",
     "esp32s3",
     "exception-handler",
     "panic-handler",
-    "println",
 ] }
-esp-hal = { version = "0.19.0", features = [ "async", "embedded-hal", "esp32s3", "log" ] }
-esp-hal-embassy = { version = "0.2.0", features = ["esp32s3"] }
-esp-println = { version = "0.10.0", features = ["esp32s3", "log"] }
-esp-wifi = { version = "0.7.1", features = [
+esp-hal = { version = "0.19.0", features = ["async", "defmt", "embedded-hal", "esp32s3"] }
+esp-hal-embassy = { version = "0.2.0", features = ["defmt", "esp32s3"] }
+esp-println = { version = "0.10.0", features = ["defmt-espflash", "esp32s3"] }
+esp-wifi = { version = "0.7.1", default-features = false, features = [
     "async",
+    "defmt",
     "embassy-net", 
     "esp32s3",
     "phy-enable-usb",
@@ -36,8 +38,7 @@ esp-wifi = { version = "0.7.1", features = [
     "wifi",
     "wifi-default",
 ] }
-heapless = { version = "0.8.0", default-features = false }
-log = { version = "0.4.21" }
+heapless = { version = "0.8.0", default-features = false, features = ["defmt-03"] }
 smoltcp = { version = "0.11.0", default-features = false, features = [
     "medium-ethernet",
     "proto-dhcpv4",
@@ -50,7 +51,7 @@ smoltcp = { version = "0.11.0", default-features = false, features = [
     "socket-udp",
 ] }
 static_cell = { version = "2.1.0", features = ["nightly"] }
-stratum-v1 = { version = "0.1.0", features = ["log"], git = "https://github.com/Foundation-Devices/foundation-rs.git", branch = "stratum-v1" }
+stratum-v1 = { version = "0.1.0", features = ["defmt-03"], git = "https://github.com/Foundation-Devices/foundation-rs.git", branch = "stratum-v1" }
 
 [profile.dev]
 # Rust debug is too slow.
