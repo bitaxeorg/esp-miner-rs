@@ -24,4 +24,4 @@ and more to come.
   peripherals and/or devices of `esp-hal`)
 
 ## Flash and Run
-`SSID="my_ssid" PASSWORD="my_password" cargo build --release`
+`SSID="my_ssid" PASSWORD="my_password" cargo run --release`

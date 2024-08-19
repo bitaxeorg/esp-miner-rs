@@ -2,6 +2,7 @@
 #![no_main]
 
 use core::str::FromStr;
+use defmt::{debug, error, info};
 use embassy_executor::Spawner;
 use embassy_net::{tcp::TcpSocket, Config, Ipv4Address, Stack, StackResources};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex, signal::Signal};
@@ -15,7 +16,7 @@ use esp_hal::{
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
 };
-use esp_println::println;
+use esp_println as _;
 use esp_wifi::{
     initialize,
     wifi::{
@@ -43,8 +44,6 @@ const PASSWORD: &str = env!("PASSWORD");
 
 #[main]
 async fn main(spawner: Spawner) -> ! {
-    esp_println::logger::init_logger_from_env();
-
     let peripherals = Peripherals::take();
 
     let system = SystemControl::new(peripherals.SYSTEM);
@@ -99,10 +98,10 @@ async fn main(spawner: Spawner) -> ! {
         Timer::after(Duration::from_millis(500)).await;
     }
 
-    println!("Waiting to get IP address...");
+    info!("Waiting to get IP address...");
     loop {
         if let Some(config) = stack.config_v4() {
-            println!("Got IP: {}", config.address);
+            info!("Got IP: {}", config.address);
             break;
         }
         Timer::after(Duration::from_millis(500)).await;
@@ -119,13 +118,13 @@ async fn main(spawner: Spawner) -> ! {
         socket.set_timeout(Some(embassy_time::Duration::from_secs(3)));
 
         let remote_endpoint = (Ipv4Address::new(68, 235, 52, 36), 21496); // public-pool
-        println!("connecting...");
+        info!("connecting to pool...");
         let r = socket.connect(remote_endpoint).await;
         if let Err(e) = r {
-            println!("connect error: {:?}", e);
+            error!("connect error: {:?}", e);
             continue;
         }
-        println!("connected!");
+        info!("connected!");
 
         let mut client = Client::<_, 1480, 512>::new(socket);
         client.enable_software_rolling(false, true, false);
@@ -211,7 +210,7 @@ async fn stratum_v1_rx_task(
                 }
             }
             Err(e) => {
-                println!("Client receive_message error: {:?}", e);
+                error!("Client receive_message error: {:?}", e);
             }
         }
     }
@@ -248,8 +247,8 @@ async fn stratum_v1_tx_task(
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
-    println!("start connection task");
-    println!("Device capabilities: {:?}", controller.get_capabilities());
+    debug!("start connection task");
+    // trace!("Device capabilities: {:?}", controller.get_capabilities());
     loop {
         if esp_wifi::wifi::get_wifi_state() == WifiState::StaConnected {
             // wait until we're no longer connected
@@ -263,16 +262,16 @@ async fn connection(mut controller: WifiController<'static>) {
                 ..Default::default()
             });
             controller.set_configuration(&client_config).unwrap();
-            println!("Starting wifi");
+            debug!("Starting wifi");
             controller.start().await.unwrap();
-            println!("Wifi started!");
+            debug!("Wifi started!");
         }
-        println!("About to connect...");
+        debug!("About to connect...");
 
         match controller.connect().await {
-            Ok(_) => println!("Wifi connected!"),
+            Ok(_) => debug!("Wifi connected!"),
             Err(e) => {
-                println!("Failed to connect to wifi: {e:?}");
+                error!("Failed to connect to wifi: {:?}", e);
                 Timer::after(Duration::from_millis(5000)).await
             }
         }
