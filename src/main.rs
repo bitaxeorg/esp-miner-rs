@@ -75,7 +75,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let config = Config::dhcpv4(Default::default());
 
-    let seed = 1234; // very random, very secure seed
+    let seed = 1234; // TODO try to find more entropy...
 
     // Init network stack
     let stack = &*mk_static!(
@@ -88,7 +88,7 @@ async fn main(spawner: Spawner) -> ! {
         )
     );
 
-    spawner.spawn(connection(controller)).ok();
+    spawner.spawn(connection_task(controller)).ok();
     spawner.spawn(net_task(stack)).ok();
 
     loop {
@@ -162,6 +162,7 @@ async fn stratum_v1_rx_task(
     client: &'static Mutex<NoopRawMutex, Client<TcpSocket<'static>, 1480, 512>>,
     authorized: &'static Signal<NoopRawMutex, bool>,
 ) {
+    debug!("start stratum v1 RX task");
     // let mut ticker = Ticker::every(Duration::from_secs(1));
     loop {
         // ticker.next().await;
@@ -221,6 +222,7 @@ async fn stratum_v1_tx_task(
     client: &'static Mutex<NoopRawMutex, Client<TcpSocket<'static>, 1480, 512>>,
     authorized: &'static Signal<NoopRawMutex, bool>,
 ) {
+    debug!("start stratum v1 TX task");
     // use the Signal from stratum_v1_rx_task to start looking for shares
     while !authorized.wait().await {
         authorized.reset();
@@ -246,7 +248,7 @@ async fn stratum_v1_tx_task(
 }
 
 #[embassy_executor::task]
-async fn connection(mut controller: WifiController<'static>) {
+async fn connection_task(mut controller: WifiController<'static>) {
     debug!("start connection task");
     // trace!("Device capabilities: {:?}", controller.get_capabilities());
     loop {
@@ -280,5 +282,6 @@ async fn connection(mut controller: WifiController<'static>) {
 
 #[embassy_executor::task]
 async fn net_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>) {
+    debug!("start network task");
     stack.run().await
 }
