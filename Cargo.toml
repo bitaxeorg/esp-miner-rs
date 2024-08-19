@@ -14,6 +14,7 @@ categories = ["embedded", "no-std", "bitcoin"]
 embassy-executor = { version = "0.5.0", features = ["task-arena-size-40960"] }
 embassy-futures = "0.1.1"
 embassy-net = { version = "0.4.0", features = [ "tcp", "udp", "dhcpv4", "medium-ethernet"] }
+embassy-sync = "0.6.0"
 embassy-time = { version = "0.3.1", features = ["generic-queue-8"] }
 embedded-io = "0.6.1"
 embedded-io-async = "0.6.1"
@@ -49,6 +50,7 @@ smoltcp = { version = "0.11.0", default-features = false, features = [
     "socket-udp",
 ] }
 static_cell = { version = "2.1.0", features = ["nightly"] }
+stratum-v1 = { version = "0.1.0", features = ["log"], git = "https://github.com/Foundation-Devices/foundation-rs.git", branch = "stratum-v1" }
 
 [profile.dev]
 # Rust debug is too slow.
