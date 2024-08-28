@@ -1481,7 +1481,7 @@ dependencies = [
 [[package]]
 name = "stratum-v1"
 version = "0.1.0"
-source = "git+https://github.com/Foundation-Devices/foundation-rs.git?branch=stratum-v1#8f8e4601d6645d27e2a563087fadc056bb621d4f"
+source = "git+https://github.com/Foundation-Devices/foundation-rs.git?branch=stratum-v1#87462a85a806cb3e647842ee96f31337b1e64afe"
 dependencies = [
  "bitcoin_hashes",
  "defmt",

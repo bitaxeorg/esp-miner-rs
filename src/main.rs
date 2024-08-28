@@ -2,7 +2,7 @@
 #![no_main]
 
 use core::str::FromStr;
-use defmt::{debug, error, info};
+use defmt::{debug, error, info, trace};
 use embassy_executor::Spawner;
 use embassy_net::{tcp::TcpSocket, Config, Ipv4Address, Stack, StackResources};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex, signal::Signal};
@@ -115,7 +115,6 @@ async fn main(spawner: Spawner) -> ! {
             mk_static!([u8; 1536], [0; 1536]),
             mk_static!([u8; 1536], [0; 1536]),
         );
-        socket.set_timeout(Some(embassy_time::Duration::from_secs(3)));
 
         let remote_endpoint = (Ipv4Address::new(68, 235, 52, 36), 21496); // public-pool
         info!("connecting to pool...");
@@ -149,8 +148,10 @@ async fn main(spawner: Spawner) -> ! {
             subscribe_extranonce: None,
             info: None,
         };
-        let mut client = client.lock().await;
-        client.send_configure(exts).await.unwrap();
+        {
+            let mut client = client.lock().await;
+            client.send_configure(exts).await.unwrap();
+        }
         loop {
             Timer::after(Duration::from_millis(5_000)).await;
         }
@@ -167,6 +168,7 @@ async fn stratum_v1_rx_task(
     loop {
         // ticker.next().await;
         let mut client = client.lock().await;
+        trace!("Polling message...");
         match client.poll_message().await {
             Ok(msg) => {
                 if let Some(msg) = msg {
