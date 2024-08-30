@@ -3,6 +3,7 @@
 
 use core::str::FromStr;
 use defmt::{debug, error, info, trace};
+use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_net::{tcp::TcpSocket, Config, Ipv4Address, Stack, StackResources};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex, signal::Signal};
@@ -10,7 +11,9 @@ use embassy_time::{Duration, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    peripherals::Peripherals,
+    gpio::Io,
+    i2c::I2C,
+    peripherals::{Peripherals, I2C0},
     prelude::*,
     rng::Rng,
     system::SystemControl,
@@ -62,6 +65,28 @@ async fn main(spawner: Spawner) -> ! {
         &clocks,
     )
     .unwrap();
+
+    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
+
+    static I2C_BUS: StaticCell<Mutex<NoopRawMutex, I2C<'_, I2C0, esp_hal::Async>>> =
+        StaticCell::new();
+    let i2c = I2C::new_async(
+        peripherals.I2C0,
+        io.pins.gpio47,
+        io.pins.gpio48,
+        400.kHz(),
+        &clocks,
+    );
+    let i2c_bus = Mutex::new(i2c);
+    let i2c_bus = I2C_BUS.init(i2c_bus);
+
+    // TODO: this EMC2101 should be abstracted by AsicTemp and SetFan trait and enabled by a feature to handle different hardware
+    let mut emc2101 = emc2101::AsyncEMC2101::new(I2cDevice::new(i2c_bus))
+        .await
+        .unwrap();
+
+    // TODO: this DS4432 should be abstracted by a SetVCore trait and enabled by a feature to handle different hardware
+    let mut ds4432 = ds4432::DS4432Async::new(I2cDevice::new(i2c_bus)).await;
 
     let wifi = peripherals.WIFI;
     let (wifi_interface, controller) =
