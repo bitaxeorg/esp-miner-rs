@@ -17,7 +17,7 @@ use esp_hal::{
     prelude::*,
     rng::Rng,
     system::SystemControl,
-    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
+    timer::timg::TimerGroup,
 };
 use esp_println as _;
 use esp_wifi::{
@@ -45,21 +45,18 @@ macro_rules! mk_static {
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
     let peripherals = Peripherals::take();
 
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
 
-    let timer = PeriodicTimer::new(
-        TimerGroup::new(peripherals.TIMG1, &clocks, None)
-            .timer0
-            .into(),
-    );
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let init = initialize(
         EspWifiInitFor::Wifi,
-        timer,
+        // timer,
+        timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
         &clocks,
@@ -81,22 +78,20 @@ async fn main(spawner: Spawner) -> ! {
     let i2c_bus = I2C_BUS.init(i2c_bus);
 
     // TODO: this EMC2101 should be abstracted by AsicTemp and SetFan trait and enabled by a feature to handle different hardware
-    let mut emc2101 = emc2101::AsyncEMC2101::new(I2cDevice::new(i2c_bus))
+    let mut _emc2101 = emc2101::AsyncEMC2101::new(I2cDevice::new(i2c_bus))
         .await
         .unwrap();
 
     // TODO: this DS4432 should be abstracted by a SetVCore trait and enabled by a feature to handle different hardware
-    let mut ds4432 = ds4432::DS4432Async::new(I2cDevice::new(i2c_bus)).await;
+    let mut _ds4432 = ds4432::DS4432Async::new(I2cDevice::new(i2c_bus)).await;
 
     let wifi = peripherals.WIFI;
     let (wifi_interface, controller) =
         esp_wifi::wifi::new_with_mode(&init, wifi, WifiStaDevice).unwrap();
 
-    let systimer = esp_hal::timer::systimer::SystemTimer::new(peripherals.SYSTIMER);
-    let alarm0: ErasedTimer = systimer.alarm0.into();
-    let timers = [OneShotTimer::new(alarm0)];
-    let timers = mk_static!([OneShotTimer<ErasedTimer>; 1], timers);
-    esp_hal_embassy::init(&clocks, timers);
+    use esp_hal::timer::systimer::{SystemTimer, Target};
+    let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+    esp_hal_embassy::init(&clocks, systimer.alarm0);
 
     let config = Config::dhcpv4(Default::default());
 
