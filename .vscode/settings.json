@@ -1,3 +1,11 @@
 {
     "rust-analyzer.check.allTargets": false,
+    "rust-analyzer.check.features": [
+        "bitaxe-max"
+    ],
+    "rust-analyzer.cargo.features": [
+        "bitaxe-max"
+    ],
+    "nixEnvSelector.suggestion": false,
+    "nixEnvSelector.nixFile": "${workspaceFolder}/shell.nix",
 }
