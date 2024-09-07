@@ -12,36 +12,59 @@ categories = ["embedded", "no-std", "bitcoin"]
 
 [dependencies]
 defmt = "0.3.8"
-ds4432 = { version = "0.1.0", default-features = false, features = ["defmt", "async"] }
+ds4432 = { version = "0.2.0", default-features = false, features = [
+    "defmt-03",
+    "async",
+] }
 embassy-embedded-hal = { version = "0.2.0", features = ["defmt"] }
 embassy-executor = { version = "0.6.0", features = ["task-arena-size-40960"] }
 embassy-futures = "0.1.1"
-embassy-net = { version = "0.4.0", features = [ "defmt", "dhcpv4", "medium-ethernet", "tcp", "udp"] }
+embassy-net = { version = "0.4.0", features = [
+    "defmt",
+    "dhcpv4",
+    "medium-ethernet",
+    "tcp",
+    "udp",
+] }
 embassy-sync = "0.6.0"
 embassy-time = { version = "0.3.1", features = ["generic-queue-8"] }
+embedded-hal-async = { version = "1.0.0", features = ["defmt-03"] }
 embedded-io = "0.6.1"
 embedded-io-async = "0.6.1"
-emc2101 = { version = "0.4.0", default-features = false, features = ["defmt-03", "async"] }
+emc2101 = { version = "0.4.0", default-features = false, features = [
+    "defmt-03",
+    "async",
+] }
 esp-backtrace = { version = "0.14.0", features = [
     "defmt",
     "esp32s3",
     "exception-handler",
     "panic-handler",
 ] }
-esp-hal = { version = "0.20.1", features = ["async", "defmt", "embedded-hal", "esp32s3"] }
+esp-hal = { version = "0.20.1", features = [
+    "async",
+    "defmt",
+    "embedded-hal",
+    "esp32s3",
+] }
 esp-hal-embassy = { version = "0.3.0", features = ["defmt", "esp32s3"] }
 esp-println = { version = "0.11.0", features = ["defmt-espflash", "esp32s3"] }
 esp-wifi = { version = "0.8.0", default-features = false, features = [
     "async",
     "defmt",
-    "embassy-net", 
+    "embassy-net",
     "esp32s3",
     "phy-enable-usb",
     "utils",
     "wifi",
     "wifi-default",
 ] }
-heapless = { version = "0.8.0", default-features = false, features = ["defmt-03"] }
+heapless = { version = "0.8.0", default-features = false, features = [
+    "defmt-03",
+] }
+ina260 = { version = "0.4.0", features = [
+    "defmt-03",
+], git = "https://github.com/korbin/ina260.git" }
 smoltcp = { version = "0.11.0", default-features = false, features = [
     "medium-ethernet",
     "proto-dhcpv4",
@@ -54,7 +77,13 @@ smoltcp = { version = "0.11.0", default-features = false, features = [
     "socket-udp",
 ] }
 static_cell = { version = "2.1.0", features = ["nightly"] }
-stratum-v1 = { version = "0.1.0", features = ["defmt-03"], git = "https://github.com/Foundation-Devices/foundation-rs.git", branch = "stratum-v1" }
+stratum-v1 = { version = "0.1.0", features = [
+    "defmt-03",
+], git = "https://github.com/Foundation-Devices/foundation-rs.git", branch = "stratum-v1" }
+
+[features]
+bitaxe-max = []
+bitaxe-ultra = []
 
 [profile.dev]
 # Rust debug is too slow.
@@ -62,7 +91,7 @@ stratum-v1 = { version = "0.1.0", features = ["defmt-03"], git = "https://github
 opt-level = "s"
 
 [profile.release]
-codegen-units = 1 # LLVM can perform better optimizations using a single thread
+codegen-units = 1        # LLVM can perform better optimizations using a single thread
 debug = 2
 debug-assertions = false
 incremental = false

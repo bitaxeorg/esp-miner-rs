@@ -356,9 +356,9 @@ dependencies = [
 
 [[package]]
 name = "ds4432"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5c9f68726331048cbe77d3bcf3db994e4b9994b1c1072ce3cab746852f077df"
+checksum = "7c338147f18c967b984ff6953fe4023c66d747f6fe170c5608fa0867d6738c43"
 dependencies = [
  "defmt",
  "embedded-hal-async",
@@ -559,6 +559,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c4c685bbef7fe13c3c6dd4da26841ed3980ef33e841cddfa15ce8a8fb3f1884"
 dependencies = [
+ "defmt",
  "embedded-hal 1.0.0",
 ]
 
@@ -817,6 +818,7 @@ dependencies = [
  "embassy-net",
  "embassy-sync 0.6.0",
  "embassy-time",
+ "embedded-hal-async",
  "embedded-io",
  "embedded-io-async",
  "emc2101",
@@ -826,6 +828,7 @@ dependencies = [
  "esp-println",
  "esp-wifi",
  "heapless",
+ "ina260",
  "smoltcp",
  "static_cell",
  "stratum-v1",
@@ -1190,6 +1193,16 @@ name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
+
+[[package]]
+name = "ina260"
+version = "0.4.0"
+source = "git+https://github.com/korbin/ina260.git#056b310693b3f6be656691a49339df223dda09b8"
+dependencies = [
+ "defmt",
+ "embedded-hal-async",
+ "maybe-async-cfg",
+]
 
 [[package]]
 name = "indexmap"

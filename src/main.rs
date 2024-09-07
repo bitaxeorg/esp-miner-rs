@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
 
+mod power;
+mod variants;
+
 use core::str::FromStr;
 use defmt::{debug, error, info, trace};
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
@@ -74,16 +77,31 @@ async fn main(spawner: Spawner) -> ! {
         400.kHz(),
         &clocks,
     );
-    let i2c_bus = Mutex::new(i2c);
-    let i2c_bus = I2C_BUS.init(i2c_bus);
+    let i2c_bus = I2C_BUS.init(Mutex::new(i2c));
 
-    // TODO: this EMC2101 should be abstracted by AsicTemp and SetFan trait and enabled by a feature to handle different hardware
+    // TODO: this EMC2101 should be abstracted by AsicTemp and SetFan trait
+    #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
     let mut _emc2101 = emc2101::AsyncEMC2101::new(I2cDevice::new(i2c_bus))
         .await
         .unwrap();
 
-    // TODO: this DS4432 should be abstracted by a SetVCore trait and enabled by a feature to handle different hardware
-    let mut _ds4432 = ds4432::DS4432Async::new(I2cDevice::new(i2c_bus)).await;
+    #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
+    let ds4432 =
+        ds4432::AsyncDS4432::with_rfs(I2cDevice::new(i2c_bus), Some(80_000), None).unwrap(); // On BitaxeMax/Ultra, Rfs0 = 80k, Rfs1 = DNP
+
+    #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
+    let ina260 = ina260::AsyncINA260::new(I2cDevice::new(i2c_bus))
+        .await
+        .unwrap();
+
+    #[cfg(feature = "bitaxe-max")]
+    let vcore_target_mv = 1.4; // TODO let user choice the targhet VCore / HashFreq
+    #[cfg(feature = "bitaxe-ultra")]
+    let vcore_target_mv = 1.2; // TODO let user choice the targhet VCore / HashFreq
+    #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
+    spawner
+        .spawn(power::vcore_task(vcore_target_mv, ds4432, Some(ina260)))
+        .ok();
 
     let wifi = peripherals.WIFI;
     let (wifi_interface, controller) =
