@@ -630,12 +630,11 @@ dependencies = [
 
 [[package]]
 name = "emc2101"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cab0e5c8a0cafead7c86ad4dc852ecd27deb6aa67d93943bc702a75ad3b5ee06"
+checksum = "941a3cf32354731c6a288778d857fea89171fae2368d5f9c75eb846358416070"
 dependencies = [
  "defmt",
- "embedded-hal 1.0.0",
  "embedded-hal-async",
  "fugit",
  "heapless",

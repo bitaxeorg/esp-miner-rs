@@ -13,8 +13,8 @@ categories = ["embedded", "no-std", "bitcoin"]
 [dependencies]
 defmt = "0.3.8"
 ds4432 = { version = "0.2.0", default-features = false, features = [
-    "defmt-03",
     "async",
+    "defmt-03",
 ] }
 embassy-embedded-hal = { version = "0.2.0", features = ["defmt"] }
 embassy-executor = { version = "0.6.0", features = ["task-arena-size-40960"] }
@@ -31,9 +31,9 @@ embassy-time = { version = "0.3.1", features = ["generic-queue-8"] }
 embedded-hal-async = { version = "1.0.0", features = ["defmt-03"] }
 embedded-io = "0.6.1"
 embedded-io-async = "0.6.1"
-emc2101 = { version = "0.4.0", default-features = false, features = [
-    "defmt-03",
+emc2101 = { version = "0.4.1", default-features = false, features = [
     "async",
+    "defmt-03",
 ] }
 esp-backtrace = { version = "0.14.1", features = [
     "defmt",
