@@ -1,6 +1,6 @@
 { pkgs ? import <nixpkgs> {}}:
 let 
-    esp-rs-src = builtins.fetchTarball "https://github.com/leighleighleigh/esp-rs-nix/archive/master.tar.gz";
+    esp-rs-src = builtins.fetchTarball "https://github.com/Georges760/esp-rs-nix/archive/v1.81.tar.gz";
     esp-rs = pkgs.callPackage "${esp-rs-src}/esp-rs/default.nix" {};
 in
 pkgs.mkShell rec {
