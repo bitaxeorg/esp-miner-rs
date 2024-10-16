@@ -12,8 +12,9 @@ categories = ["embedded", "no-std", "bitcoin"]
 
 [dependencies]
 defmt = "0.3.8"
-ds4432 = { version = "0.2.0", default-features = false, features = [
+ds4432 = { version = "0.2.1", default-features = false, features = [
     "async",
+    "core-error",
     "defmt-03",
 ] }
 embassy-embedded-hal = { version = "0.2.0", features = ["defmt"] }
@@ -33,23 +34,19 @@ embedded-io = "0.6.1"
 embedded-io-async = "0.6.1"
 emc2101 = { version = "0.4.1", default-features = false, features = [
     "async",
+    "core-error",
     "defmt-03",
 ] }
-esp-backtrace = { version = "0.14.1", features = [
+esp-backtrace = { version = "0.14.2", features = [
     "defmt",
     "esp32s3",
     "exception-handler",
     "panic-handler",
 ] }
-esp-hal = { version = "0.20.1", features = [
-    "async",
-    "defmt",
-    "embedded-hal",
-    "esp32s3",
-] }
-esp-hal-embassy = { version = "0.3.0", features = ["defmt", "esp32s3"] }
-esp-println = { version = "0.11.0", features = ["defmt-espflash", "esp32s3"] }
-esp-wifi = { version = "0.9.1", default-features = false, features = [
+esp-hal = { version = "0.21.1", features = ["defmt", "esp32s3"] }
+esp-hal-embassy = { version = "0.4.0", features = ["defmt", "esp32s3"] }
+esp-println = { version = "0.12.0", features = ["defmt-espflash", "esp32s3"] }
+esp-wifi = { version = "0.10.1", default-features = false, features = [
     "async",
     "defmt",
     "embassy-net",

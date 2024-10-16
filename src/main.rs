@@ -13,14 +13,7 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex, signal::Sign
 use embassy_time::{Duration, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
-    gpio::Io,
-    i2c::I2C,
-    peripherals::{Peripherals, I2C0},
-    prelude::*,
-    rng::Rng,
-    system::SystemControl,
-    timer::timg::TimerGroup,
+    gpio::Io, i2c::I2C, peripherals::I2C0, prelude::*, rng::Rng, timer::timg::TimerGroup,
 };
 use esp_println as _;
 use esp_wifi::{
@@ -50,19 +43,15 @@ const PASSWORD: &str = env!("PASSWORD");
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
-    let peripherals = Peripherals::take();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
-
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let init = initialize(
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    let init = init(
         EspWifiInitFor::Wifi,
         // timer,
         timg0.timer0,
         Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
-        &clocks,
     )
     .unwrap();
 
@@ -109,7 +98,7 @@ async fn main(spawner: Spawner) -> ! {
 
     use esp_hal::timer::systimer::{SystemTimer, Target};
     let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
-    esp_hal_embassy::init(&clocks, systimer.alarm0);
+    esp_hal_embassy::init(systimer.alarm0);
 
     let config = Config::dhcpv4(Default::default());
 
