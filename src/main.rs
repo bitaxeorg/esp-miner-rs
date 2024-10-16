@@ -11,6 +11,7 @@ use embassy_executor::Spawner;
 use embassy_net::{tcp::TcpSocket, Config, Ipv4Address, Stack, StackResources};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex, signal::Signal};
 use embassy_time::{Duration, Ticker, Timer};
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     gpio::Io, i2c::I2C, peripherals::I2C0, prelude::*, rng::Rng, timer::timg::TimerGroup,
@@ -44,6 +45,8 @@ const PASSWORD: &str = env!("PASSWORD");
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_alloc::heap_allocator!(72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let init = init(
