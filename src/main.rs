@@ -14,11 +14,10 @@ use embassy_time::{Duration, Ticker, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::Io, i2c::I2C, peripherals::I2C0, prelude::*, rng::Rng, timer::timg::TimerGroup,
+    gpio::Io, i2c::I2c, peripherals::I2C0, prelude::*, rng::Rng, timer::timg::TimerGroup,
 };
 use esp_println as _;
 use esp_wifi::{
-    initialize,
     wifi::{
         ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiStaDevice,
         WifiState,
@@ -49,7 +48,7 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let init = init(
+    let init = esp_wifi::init(
         EspWifiInitFor::Wifi,
         // timer,
         timg0.timer0,
@@ -60,15 +59,9 @@ async fn main(spawner: Spawner) -> ! {
 
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    static I2C_BUS: StaticCell<Mutex<NoopRawMutex, I2C<'_, I2C0, esp_hal::Async>>> =
+    static I2C_BUS: StaticCell<Mutex<NoopRawMutex, I2c<'_, I2C0, esp_hal::Async>>> =
         StaticCell::new();
-    let i2c = I2C::new_async(
-        peripherals.I2C0,
-        io.pins.gpio47,
-        io.pins.gpio48,
-        400.kHz(),
-        &clocks,
-    );
+    let i2c = I2c::new_async(peripherals.I2C0, io.pins.gpio47, io.pins.gpio48, 400.kHz());
     let i2c_bus = I2C_BUS.init(Mutex::new(i2c));
 
     // TODO: this EMC2101 should be abstracted by AsicTemp and SetFan trait
