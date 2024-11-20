@@ -8,21 +8,19 @@ use core::str::FromStr;
 use defmt::{debug, error, info, trace};
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
-use embassy_net::{tcp::TcpSocket, Config, Ipv4Address, Stack, StackResources};
+use embassy_net::{tcp::TcpSocket, Ipv4Address, Stack, StackResources};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex, signal::Signal};
 use embassy_time::{Duration, Ticker, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    gpio::Io, i2c::I2c, peripherals::I2C0, prelude::*, rng::Rng, timer::timg::TimerGroup,
-};
+use esp_hal::{i2c::master::I2c, prelude::*, rng::Rng, timer::timg::TimerGroup};
 use esp_println as _;
 use esp_wifi::{
     wifi::{
         ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiStaDevice,
         WifiState,
     },
-    EspWifiInitFor,
+    EspWifiController,
 };
 use heapless::{String, Vec};
 use static_cell::StaticCell;
@@ -43,25 +41,37 @@ const PASSWORD: &str = env!("PASSWORD");
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
-    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let peripherals = esp_hal::init({
+        let mut config = esp_hal::Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
 
     esp_alloc::heap_allocator!(72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let init = esp_wifi::init(
-        EspWifiInitFor::Wifi,
-        // timer,
-        timg0.timer0,
-        Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
+
+    let init = &*mk_static!(
+        EspWifiController<'static>,
+        esp_wifi::init(
+            timg0.timer0,
+            Rng::new(peripherals.RNG),
+            peripherals.RADIO_CLK,
+        )
+        .unwrap()
+    );
+
+    static I2C_BUS: StaticCell<Mutex<NoopRawMutex, I2c<'_, esp_hal::Async>>> = StaticCell::new();
+    let i2c = I2c::new(
+        peripherals.I2C0,
+        esp_hal::i2c::master::Config {
+            frequency: 400.kHz(),
+            timeout: None,
+        },
     )
-    .unwrap();
-
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
-    static I2C_BUS: StaticCell<Mutex<NoopRawMutex, I2c<'_, I2C0, esp_hal::Async>>> =
-        StaticCell::new();
-    let i2c = I2c::new_async(peripherals.I2C0, io.pins.gpio47, io.pins.gpio48, 400.kHz());
+    .with_sda(peripherals.GPIO47)
+    .with_scl(peripherals.GPIO48)
+    .into_async();
     let i2c_bus = I2C_BUS.init(Mutex::new(i2c));
 
     // TODO: this EMC2101 should be abstracted by AsicTemp and SetFan trait
@@ -96,7 +106,7 @@ async fn main(spawner: Spawner) -> ! {
     let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
     esp_hal_embassy::init(systimer.alarm0);
 
-    let config = Config::dhcpv4(Default::default());
+    let config = embassy_net::Config::dhcpv4(Default::default());
 
     let seed = 1234; // TODO try to find more entropy...
 
@@ -275,12 +285,15 @@ async fn stratum_v1_tx_task(
 #[embassy_executor::task]
 async fn connection_task(mut controller: WifiController<'static>) {
     debug!("start connection task");
-    // trace!("Device capabilities: {:?}", controller.get_capabilities());
+    // trace!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        if esp_wifi::wifi::get_wifi_state() == WifiState::StaConnected {
-            // wait until we're no longer connected
-            controller.wait_for_event(WifiEvent::StaDisconnected).await;
-            Timer::after(Duration::from_millis(5000)).await
+        match esp_wifi::wifi::wifi_state() {
+            WifiState::StaConnected => {
+                // wait until we're no longer connected
+                controller.wait_for_event(WifiEvent::StaDisconnected).await;
+                Timer::after(Duration::from_millis(5000)).await
+            }
+            _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
             let client_config = Configuration::Client(ClientConfiguration {
@@ -290,12 +303,12 @@ async fn connection_task(mut controller: WifiController<'static>) {
             });
             controller.set_configuration(&client_config).unwrap();
             debug!("Starting wifi");
-            controller.start().await.unwrap();
+            controller.start_async().await.unwrap();
             debug!("Wifi started!");
         }
         debug!("About to connect...");
 
-        match controller.connect().await {
+        match controller.connect_async().await {
             Ok(_) => debug!("Wifi connected!"),
             Err(e) => {
                 error!("Failed to connect to wifi: {:?}", e);
