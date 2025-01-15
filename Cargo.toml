@@ -43,7 +43,7 @@ esp-backtrace = { version = "0.15.0", features = [
     "exception-handler",
     "panic-handler",
 ] }
-esp-hal = { version = "0.23.0", features = ["defmt", "esp32s3"] }
+esp-hal = { version = "0.23.1", features = ["defmt", "esp32s3"] }
 esp-hal-embassy = { version = "0.6.0", features = ["defmt", "esp32s3"] }
 esp-println = { version = "0.13.0", features = ["defmt-espflash", "esp32s3"] }
 esp-wifi = { version = "0.12.0", features = [
