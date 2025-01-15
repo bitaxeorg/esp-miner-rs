@@ -11,43 +11,42 @@ keywords = ["embedded", "embedded-hal", "esp", "esp32s3", "no-std"]
 categories = ["embedded", "no-std", "bitcoin"]
 
 [dependencies]
-defmt = "0.3.8"
+defmt = "0.3.10"
 ds4432 = { version = "0.2.1", default-features = false, features = [
     "async",
     "core-error",
     "defmt-03",
 ] }
-embassy-embedded-hal = { version = "0.2.0", features = ["defmt"] }
-embassy-executor = { version = "0.6.3", features = ["task-arena-size-12288"] }
+embassy-embedded-hal = { version = "0.3.0", features = ["defmt"] }
+embassy-executor = { version = "0.7.0", features = ["task-arena-size-12288"] }
 embassy-futures = "0.1.1"
-embassy-net = { version = "0.4.0", features = [
+embassy-net = { version = "0.6.0", features = [
     "defmt",
     "dhcpv4",
     "medium-ethernet",
     "tcp",
     "udp",
 ] }
-embassy-sync = "0.6.0"
-embassy-time = { version = "0.3.1", features = ["generic-queue-8"] }
+embassy-sync = "0.6.1"
+embassy-time = { version = "0.4.0", features = ["generic-queue-8"] }
 embedded-hal-async = { version = "1.0.0", features = ["defmt-03"] }
 embedded-io = "0.6.1"
 embedded-io-async = "0.6.1"
-emc2101 = { version = "0.4.1", default-features = false, features = [
+emc2101 = { version = "1.0.0", default-features = false, features = [
     "async",
-    "core-error",
     "defmt-03",
 ] }
-esp-alloc = { version = "0.5.0" }
-esp-backtrace = { version = "0.14.2", features = [
+esp-alloc = { version = "0.6.0" }
+esp-backtrace = { version = "0.15.0", features = [
     "defmt",
     "esp32s3",
     "exception-handler",
     "panic-handler",
 ] }
-esp-hal = { version = "0.22.0", features = ["defmt", "esp32s3"] }
-esp-hal-embassy = { version = "0.5.0", features = ["defmt", "esp32s3"] }
-esp-println = { version = "0.12.0", features = ["defmt-espflash", "esp32s3"] }
-esp-wifi = { version = "0.11.0", features = [
+esp-hal = { version = "0.23.0", features = ["defmt", "esp32s3"] }
+esp-hal-embassy = { version = "0.6.0", features = ["defmt", "esp32s3"] }
+esp-println = { version = "0.13.0", features = ["defmt-espflash", "esp32s3"] }
+esp-wifi = { version = "0.12.0", features = [
     "defmt",
     "esp32s3",
     "utils",
@@ -59,10 +58,9 @@ heapless = { version = "0.8.0", default-features = false, features = [
 ina260 = { version = "0.4.0", features = [
     "defmt-03",
 ], git = "https://github.com/korbin/ina260.git" }
-smoltcp = { version = "0.11.0", default-features = false, features = [
+smoltcp = { version = "0.12.0", default-features = false, features = [
     "medium-ethernet",
     "proto-dhcpv4",
-    "proto-igmp",
     "proto-ipv4",
     "socket-dhcpv4",
     "socket-icmp",

@@ -4,16 +4,18 @@
 // mod power;
 mod variants;
 
-use core::str::FromStr;
+use core::{net::Ipv4Addr, str::FromStr};
 use defmt::{debug, error, info, trace};
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
-use embassy_net::{tcp::TcpSocket, Ipv4Address, Stack, StackResources};
+use embassy_net::{tcp::TcpSocket, Runner, StackResources};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex, signal::Signal};
 use embassy_time::{Duration, Ticker, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{i2c::master::I2c, prelude::*, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{
+    clock::CpuClock, i2c::master::I2c, rng::Rng, time::RateExtU32, timer::timg::TimerGroup,
+};
 use esp_println as _;
 use esp_wifi::{
     wifi::{
@@ -41,34 +43,25 @@ const PASSWORD: &str = env!("PASSWORD");
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    let peripherals = esp_hal::init(config);
 
     esp_alloc::heap_allocator!(72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+    let mut rng = Rng::new(peripherals.RNG);
 
     let init = &*mk_static!(
         EspWifiController<'static>,
-        esp_wifi::init(
-            timg0.timer0,
-            Rng::new(peripherals.RNG),
-            peripherals.RADIO_CLK,
-        )
-        .unwrap()
+        esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK,).unwrap()
     );
 
     static I2C_BUS: StaticCell<Mutex<NoopRawMutex, I2c<'_, esp_hal::Async>>> = StaticCell::new();
     let i2c = I2c::new(
         peripherals.I2C0,
-        esp_hal::i2c::master::Config {
-            frequency: 400.kHz(),
-            timeout: None,
-        },
+        esp_hal::i2c::master::Config::default().with_frequency(400.kHz()),
     )
+    .unwrap()
     .with_sda(peripherals.GPIO47)
     .with_scl(peripherals.GPIO48)
     .into_async();
@@ -93,6 +86,7 @@ async fn main(spawner: Spawner) -> ! {
     let _vcore_target_mv = 1.4; // TODO let user choice the target VCore / HashFreq
     #[cfg(feature = "bitaxe-ultra")]
     let _vcore_target_mv = 1.2; // TODO let user choice the target VCore / HashFreq
+
     // #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
     // spawner
     //     .spawn(power::vcore_task(vcore_target_mv, ds4432, Some(ina260)))
@@ -102,27 +96,24 @@ async fn main(spawner: Spawner) -> ! {
     let (wifi_interface, controller) =
         esp_wifi::wifi::new_with_mode(init, wifi, WifiStaDevice).unwrap();
 
-    use esp_hal::timer::systimer::{SystemTimer, Target};
-    let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+    use esp_hal::timer::systimer::SystemTimer;
+    let systimer = SystemTimer::new(peripherals.SYSTIMER);
     esp_hal_embassy::init(systimer.alarm0);
 
     let config = embassy_net::Config::dhcpv4(Default::default());
 
-    let seed = 1234; // TODO try to find more entropy...
+    let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
     // Init network stack
-    let stack = &*mk_static!(
-        Stack<WifiDevice<'_, WifiStaDevice>>,
-        Stack::new(
-            wifi_interface,
-            config,
-            mk_static!(StackResources<3>, StackResources::<3>::new()),
-            seed
-        )
+    let (stack, runner) = embassy_net::new(
+        wifi_interface,
+        config,
+        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        seed,
     );
 
     spawner.spawn(connection_task(controller)).ok();
-    spawner.spawn(net_task(stack)).ok();
+    spawner.spawn(net_task(runner)).ok();
 
     loop {
         if stack.is_link_up() {
@@ -149,7 +140,7 @@ async fn main(spawner: Spawner) -> ! {
             mk_static!([u8; 1536], [0; 1536]),
         );
 
-        let remote_endpoint = (Ipv4Address::new(68, 235, 52, 36), 21496); // public-pool
+        let remote_endpoint = (Ipv4Addr::new(68, 235, 52, 36), 21496); // public-pool
         info!("connecting to pool...");
         let r = socket.connect(remote_endpoint).await;
         if let Err(e) = r {
@@ -287,13 +278,10 @@ async fn connection_task(mut controller: WifiController<'static>) {
     debug!("start connection task");
     // trace!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_wifi::wifi::wifi_state() {
-            WifiState::StaConnected => {
-                // wait until we're no longer connected
-                controller.wait_for_event(WifiEvent::StaDisconnected).await;
-                Timer::after(Duration::from_millis(5000)).await
-            }
-            _ => {}
+        if esp_wifi::wifi::wifi_state() == WifiState::StaConnected {
+            // wait until we're no longer connected
+            controller.wait_for_event(WifiEvent::StaDisconnected).await;
+            Timer::after(Duration::from_millis(5000)).await
         }
         if !matches!(controller.is_started(), Ok(true)) {
             let client_config = Configuration::Client(ClientConfiguration {
@@ -319,7 +307,6 @@ async fn connection_task(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>) {
-    debug!("start network task");
-    stack.run().await
+async fn net_task(mut runner: Runner<'static, WifiDevice<'static, WifiStaDevice>>) {
+    runner.run().await
 }
