@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-mod power;
+// mod power;
 mod variants;
 
 use core::str::FromStr;
@@ -81,26 +81,26 @@ async fn main(spawner: Spawner) -> ! {
         .unwrap();
 
     #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
-    let ds4432 =
+    let _ds4432 =
         ds4432::AsyncDS4432::with_rfs(I2cDevice::new(i2c_bus), Some(80_000), None).unwrap(); // On BitaxeMax/Ultra, Rfs0 = 80k, Rfs1 = DNP
 
     #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
-    let ina260 = ina260::AsyncINA260::new(I2cDevice::new(i2c_bus))
+    let _ina260 = ina260::AsyncINA260::new(I2cDevice::new(i2c_bus))
         .await
         .unwrap();
 
     #[cfg(feature = "bitaxe-max")]
-    let vcore_target_mv = 1.4; // TODO let user choice the targhet VCore / HashFreq
+    let _vcore_target_mv = 1.4; // TODO let user choice the target VCore / HashFreq
     #[cfg(feature = "bitaxe-ultra")]
-    let vcore_target_mv = 1.2; // TODO let user choice the targhet VCore / HashFreq
-    #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
-    spawner
-        .spawn(power::vcore_task(vcore_target_mv, ds4432, Some(ina260)))
-        .ok();
+    let _vcore_target_mv = 1.2; // TODO let user choice the target VCore / HashFreq
+    // #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
+    // spawner
+    //     .spawn(power::vcore_task(vcore_target_mv, ds4432, Some(ina260)))
+    //     .ok();
 
     let wifi = peripherals.WIFI;
     let (wifi_interface, controller) =
-        esp_wifi::wifi::new_with_mode(&init, wifi, WifiStaDevice).unwrap();
+        esp_wifi::wifi::new_with_mode(init, wifi, WifiStaDevice).unwrap();
 
     use esp_hal::timer::systimer::{SystemTimer, Target};
     let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
