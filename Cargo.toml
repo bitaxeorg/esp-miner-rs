@@ -27,7 +27,7 @@ embassy-net = { version = "0.6.0", features = [
     "tcp",
     "udp",
 ] }
-embassy-sync = "0.6.1"
+embassy-sync = "0.6.2"
 embassy-time = { version = "0.4.0", features = ["generic-queue-8"] }
 embedded-hal-async = { version = "1.0.0", features = ["defmt-03"] }
 embedded-io = "0.6.1"
