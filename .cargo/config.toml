@@ -1,17 +1,23 @@
 [target.xtensa-esp32s3-none-elf]
-runner = "espflash flash --monitor --log-format=defmt --no-stub"
-
+# runner = "espflash flash --monitor --log-format=defmt --no-stub"
+runner = [
+  "probe-rs",
+  "run",
+  "--log-format={{t:dimmed} [{L:bold}]} {s}  {{c} {ff}:{l:1}%dimmed}",
+]
 
 [env]
-DEFMT_LOG="info"
+DEFMT_LOG = "info"
 
 [build]
 rustflags = [
-  "-C", "link-arg=-Tlinkall.x",
-  "-C", "link-arg=-nostartfiles",
-  "-C", "link-arg=-Tdefmt.x",
+  "-C",
+  "link-arg=-Wl,-Tlinkall.x",
+  "-C",
+  "link-arg=-nostartfiles",
+  "-C",
+  "link-arg=-Tdefmt.x",
 ]
-
 target = "xtensa-esp32s3-none-elf"
 
 [unstable]

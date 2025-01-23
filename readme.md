@@ -30,14 +30,14 @@ nix-shell
 dev profile can potentially be one or more orders of magnitude slower than release, and may cause issues with timing-senstive peripherals and/or devices of `esp-hal`
 
 ### Using Just
-- edit the just file to change your local wifi SSID/PASSORD
+- edit the just file to change your local WIFI SSID/PASSWORD
 - `just build max` to build esp-miner-rs for [BitaxeMax]
 - `just build ultra` to build esp-miner-rs for [BitaxeUltra]
 - `just run max` to build/flash/run esp-miner-rs for [BitaxeMax] on the connected hardware
 
 ### Manually
-- `SSID="my_ssid" PASSWORD="my_password" cargo build --release --features=bitaxe-max`
-- `SSID="my_ssid" PASSWORD="my_password" cargo run --release --features=bitaxe-max`
+- `WIFI_SSID="my_ssid" WIFI_PASSWORD="my_password" cargo build --release --features=bitaxe-max`
+- `WIFI_SSID="my_ssid" WIFI_PASSWORD="my_password" cargo run --release --features=bitaxe-max`
 
 [BitaxeMax]:https://github.com/skot/bitaxe/tree/max-v2.3
 [BitaxeUltra]:https://github.com/skot/bitaxe/tree/ultra-204

@@ -6,6 +6,7 @@ mod variants;
 
 use core::{net::Ipv4Addr, str::FromStr};
 use defmt::{debug, error, info, trace};
+use defmt_rtt as _;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_net::{tcp::TcpSocket, Runner, StackResources};
@@ -16,7 +17,6 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock, i2c::master::I2c, rng::Rng, time::RateExtU32, timer::timg::TimerGroup,
 };
-use esp_println as _;
 use esp_wifi::{
     wifi::{
         ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiStaDevice,
@@ -38,8 +38,8 @@ macro_rules! mk_static {
     }};
 }
 
-const SSID: &str = env!("SSID");
-const PASSWORD: &str = env!("PASSWORD");
+const WIFI_SSID: &str = env!("WIFI_SSID");
+const WIFI_PASSWORD: &str = env!("WIFI_PASSWORD");
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) -> ! {
@@ -53,7 +53,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let init = &*mk_static!(
         EspWifiController<'static>,
-        esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK,).unwrap()
+        esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK).unwrap()
     );
 
     static I2C_BUS: StaticCell<Mutex<NoopRawMutex, I2c<'_, esp_hal::Async>>> = StaticCell::new();
@@ -276,7 +276,7 @@ async fn stratum_v1_tx_task(
 #[embassy_executor::task]
 async fn connection_task(mut controller: WifiController<'static>) {
     debug!("start connection task");
-    // trace!("Device capabilities: {:?}", controller.capabilities());
+    trace!("Device capabilities: {:?}", controller.capabilities());
     loop {
         if esp_wifi::wifi::wifi_state() == WifiState::StaConnected {
             // wait until we're no longer connected
@@ -285,8 +285,8 @@ async fn connection_task(mut controller: WifiController<'static>) {
         }
         if !matches!(controller.is_started(), Ok(true)) {
             let client_config = Configuration::Client(ClientConfiguration {
-                ssid: SSID.try_into().unwrap(),
-                password: PASSWORD.try_into().unwrap(),
+                ssid: WIFI_SSID.try_into().unwrap(),
+                password: WIFI_PASSWORD.try_into().unwrap(),
                 ..Default::default()
             });
             controller.set_configuration(&client_config).unwrap();

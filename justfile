@@ -1,7 +1,7 @@
 set export
 
-SSID := "my_ssid"
-PASSWORD := "my_password"
+WIFI_SSID := "my_ssid"
+WIFI_PASSWORD := "my_password"
 
 build b:
   cargo build --release --features=bitaxe-$b

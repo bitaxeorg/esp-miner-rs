@@ -171,6 +171,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "defmt-rtt"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bab697b3dbbc1750b7c8b821aa6f6e7f2480b47a99bc057a2ed7b170ebef0c51"
+dependencies = [
+ "critical-section",
+ "defmt",
+]
+
+[[package]]
 name = "delegate"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -324,7 +334,6 @@ dependencies = [
  "critical-section",
  "document-features",
  "embassy-time-driver",
- "embassy-time-queue-utils",
  "embedded-hal 0.2.7",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
@@ -680,6 +689,7 @@ name = "esp-miner-rs"
 version = "0.1.0"
 dependencies = [
  "defmt",
+ "defmt-rtt",
  "ds4432",
  "embassy-embedded-hal",
  "embassy-executor",
@@ -695,7 +705,6 @@ dependencies = [
  "esp-backtrace",
  "esp-hal",
  "esp-hal-embassy",
- "esp-println",
  "esp-wifi",
  "heapless",
  "ina260",
@@ -710,11 +719,8 @@ version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "645e54eb592ca0a3d60213b1695e2a5fc0b51ca6d693c08d6983857224a629ed"
 dependencies = [
- "critical-section",
- "defmt",
  "esp-build",
  "log",
- "portable-atomic",
 ]
 
 [[package]]

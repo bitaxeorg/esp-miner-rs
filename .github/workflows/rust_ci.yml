@@ -10,8 +10,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  SSID: TestSSID
-  PASSWORD: TestPASSWORD
+  WIFI_SSID: TestSSID
+  WIFI_PASSWORD: TestPASSWORD
 
 jobs:
   rust-checks:
