@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+mod io06;
 // mod power;
 mod variants;
 
@@ -14,26 +15,26 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex, signal::Sign
 use embassy_time::{Duration, Ticker, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::CpuClock, i2c::master::I2c, rng::Rng, time::RateExtU32, timer::timg::TimerGroup,
-};
-use esp_wifi::{
-    wifi::{
-        ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiStaDevice,
-        WifiState,
-    },
-    EspWifiController,
+use esp_hal::{clock::CpuClock, i2c::master::I2c, rng::Rng, time::Rate, timer::timg::TimerGroup};
+use esp_radio::wifi::{
+    sta::StationConfig, AuthenticationMethodConfig, Config, ControllerConfig, Interface,
+    WifiController,
 };
 use heapless::{String, Vec};
+use io06::Io06;
 use static_cell::StaticCell;
 use stratum_v1::{Client, Extensions, Message, Share, VersionRolling};
+
+esp_bootloader_esp_idf::esp_app_desc!();
+
+type StratumClient = Client<Io06<TcpSocket<'static>>, 1480, 512>;
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
         static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
         #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
+        let x = STATIC_CELL.uninit().write($val);
         x
     }};
 }
@@ -41,25 +42,20 @@ macro_rules! mk_static {
 const WIFI_SSID: &str = env!("WIFI_SSID");
 const WIFI_PASSWORD: &str = env!("WIFI_PASSWORD");
 
-#[esp_hal_embassy::main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(72 * 1024);
+    esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let mut rng = Rng::new(peripherals.RNG);
-
-    let init = &*mk_static!(
-        EspWifiController<'static>,
-        esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK).unwrap()
-    );
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     static I2C_BUS: StaticCell<Mutex<NoopRawMutex, I2c<'_, esp_hal::Async>>> = StaticCell::new();
     let i2c = I2c::new(
         peripherals.I2C0,
-        esp_hal::i2c::master::Config::default().with_frequency(400.kHz()),
+        esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
     )
     .unwrap()
     .with_sda(peripherals.GPIO47)
@@ -92,16 +88,23 @@ async fn main(spawner: Spawner) -> ! {
     //     .spawn(power::vcore_task(vcore_target_mv, ds4432, Some(ina260)))
     //     .ok();
 
-    let wifi = peripherals.WIFI;
-    let (wifi_interface, controller) =
-        esp_wifi::wifi::new_with_mode(init, wifi, WifiStaDevice).unwrap();
-
-    use esp_hal::timer::systimer::SystemTimer;
-    let systimer = SystemTimer::new(peripherals.SYSTIMER);
-    esp_hal_embassy::init(systimer.alarm0);
+    let station_config = Config::Station(
+        StationConfig::default()
+            .with_ssid(WIFI_SSID.try_into().unwrap())
+            .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
+                WIFI_PASSWORD.try_into().unwrap(),
+            )),
+    );
+    let wifi_interface = Interface::station();
+    let controller = WifiController::new(
+        peripherals.WIFI,
+        ControllerConfig::default().with_initial_config(station_config),
+    )
+    .unwrap();
 
     let config = embassy_net::Config::dhcpv4(Default::default());
 
+    let rng = Rng::new();
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
     // Init network stack
@@ -112,8 +115,8 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    spawner.spawn(connection_task(controller)).ok();
-    spawner.spawn(net_task(runner)).ok();
+    spawner.spawn(connection_task(controller).unwrap());
+    spawner.spawn(net_task(runner).unwrap());
 
     loop {
         if stack.is_link_up() {
@@ -149,19 +152,19 @@ async fn main(spawner: Spawner) -> ! {
         }
         info!("connected!");
 
-        let mut client = Client::<_, 1480, 512>::new(socket);
+        let mut client = StratumClient::new(Io06(socket));
         client.enable_software_rolling(false, true, false);
 
         let client = mk_static!(
-            Mutex::<NoopRawMutex, Client<TcpSocket, 1480, 512>>,
+            Mutex::<NoopRawMutex, StratumClient>,
             Mutex::<NoopRawMutex, _>::new(client)
         );
 
         static AUTH_SIGNAL: StaticCell<Signal<NoopRawMutex, bool>> = StaticCell::new();
         let auth_signal = &*AUTH_SIGNAL.init(Signal::new());
 
-        spawner.spawn(stratum_v1_rx_task(client, auth_signal)).ok();
-        spawner.spawn(stratum_v1_tx_task(client, auth_signal)).ok();
+        spawner.spawn(stratum_v1_rx_task(client, auth_signal).unwrap());
+        spawner.spawn(stratum_v1_tx_task(client, auth_signal).unwrap());
 
         let exts = Extensions {
             version_rolling: Some(VersionRolling {
@@ -184,7 +187,7 @@ async fn main(spawner: Spawner) -> ! {
 
 #[embassy_executor::task]
 async fn stratum_v1_rx_task(
-    client: &'static Mutex<NoopRawMutex, Client<TcpSocket<'static>, 1480, 512>>,
+    client: &'static Mutex<NoopRawMutex, StratumClient>,
     authorized: &'static Signal<NoopRawMutex, bool>,
 ) {
     debug!("start stratum v1 RX task");
@@ -245,7 +248,7 @@ async fn stratum_v1_rx_task(
 
 #[embassy_executor::task]
 async fn stratum_v1_tx_task(
-    client: &'static Mutex<NoopRawMutex, Client<TcpSocket<'static>, 1480, 512>>,
+    client: &'static Mutex<NoopRawMutex, StratumClient>,
     authorized: &'static Signal<NoopRawMutex, bool>,
 ) {
     debug!("start stratum v1 TX task");
@@ -276,37 +279,25 @@ async fn stratum_v1_tx_task(
 #[embassy_executor::task]
 async fn connection_task(mut controller: WifiController<'static>) {
     debug!("start connection task");
-    trace!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        if esp_wifi::wifi::wifi_state() == WifiState::StaConnected {
-            // wait until we're no longer connected
-            controller.wait_for_event(WifiEvent::StaDisconnected).await;
-            Timer::after(Duration::from_millis(5000)).await
-        }
-        if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = Configuration::Client(ClientConfiguration {
-                ssid: WIFI_SSID.try_into().unwrap(),
-                password: WIFI_PASSWORD.try_into().unwrap(),
-                ..Default::default()
-            });
-            controller.set_configuration(&client_config).unwrap();
-            debug!("Starting wifi");
-            controller.start_async().await.unwrap();
-            debug!("Wifi started!");
-        }
         debug!("About to connect...");
 
         match controller.connect_async().await {
-            Ok(_) => debug!("Wifi connected!"),
+            Ok(_) => {
+                debug!("Wifi connected!");
+                // wait until we're no longer connected
+                controller.wait_for_disconnect_async().await.ok();
+                debug!("Wifi disconnected");
+            }
             Err(e) => {
                 error!("Failed to connect to wifi: {:?}", e);
-                Timer::after(Duration::from_millis(5000)).await
             }
         }
+        Timer::after(Duration::from_millis(5000)).await
     }
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, WifiDevice<'static, WifiStaDevice>>) {
+async fn net_task(mut runner: Runner<'static, Interface>) {
     runner.run().await
 }
