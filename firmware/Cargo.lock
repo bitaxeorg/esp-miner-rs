@@ -125,6 +125,68 @@ dependencies = [
 ]
 
 [[package]]
+name = "bm1366"
+version = "0.2.0"
+source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=f295ee0481bd471e3a100c278461cd3d9d6ff21b#f295ee0481bd471e3a100c278461cd3d9d6ff21b"
+dependencies = [
+ "bm13xx-asic",
+ "bm13xx-protocol",
+ "defmt 1.2.0",
+ "fugit 0.3.9",
+ "heapless 0.9.3",
+]
+
+[[package]]
+name = "bm1397"
+version = "0.2.0"
+source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=f295ee0481bd471e3a100c278461cd3d9d6ff21b#f295ee0481bd471e3a100c278461cd3d9d6ff21b"
+dependencies = [
+ "bm13xx-asic",
+ "bm13xx-protocol",
+ "defmt 1.2.0",
+ "fugit 0.3.9",
+ "heapless 0.9.3",
+]
+
+[[package]]
+name = "bm13xx-asic"
+version = "0.2.0"
+source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=f295ee0481bd471e3a100c278461cd3d9d6ff21b#f295ee0481bd471e3a100c278461cd3d9d6ff21b"
+dependencies = [
+ "bm13xx-protocol",
+ "defmt 1.2.0",
+ "derive_more 2.1.1",
+ "fugit 0.3.9",
+]
+
+[[package]]
+name = "bm13xx-chain"
+version = "0.2.0"
+source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=f295ee0481bd471e3a100c278461cd3d9d6ff21b#f295ee0481bd471e3a100c278461cd3d9d6ff21b"
+dependencies = [
+ "bm13xx-asic",
+ "bm13xx-protocol",
+ "defmt 1.2.0",
+ "derive_more 2.1.1",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "embedded-io-async 0.6.1",
+ "fugit 0.3.9",
+ "heapless 0.9.3",
+]
+
+[[package]]
+name = "bm13xx-protocol"
+version = "0.2.0"
+source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=f295ee0481bd471e3a100c278461cd3d9d6ff21b#f295ee0481bd471e3a100c278461cd3d9d6ff21b"
+dependencies = [
+ "crc",
+ "defmt 1.2.0",
+ "derive_more 2.1.1",
+ "heapless 0.9.3",
+]
+
+[[package]]
 name = "bounded-integer"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -244,6 +306,21 @@ checksum = "5ca28b0ae3115b884660db4118d803791fd6756b6e88f39c0f3f7859060d7566"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "crc"
+version = "3.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5eb8a2a1cd12ab0d987a5d5e825195d372001a4094a0376319d5a0ad71c1ba0d"
+dependencies = [
+ "crc-catalog",
+]
+
+[[package]]
+name = "crc-catalog"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "217698eaf96b4a3f0bc4f3662aaa55bdf913cd54d7204591faa790070c6d0853"
 
 [[package]]
 name = "critical-section"
@@ -449,7 +526,16 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a9b99b9cbbe49445b21764dc0625032a89b145a2642e67603e1c936f5458d05"
 dependencies = [
- "derive_more-impl",
+ "derive_more-impl 1.0.0",
+]
+
+[[package]]
+name = "derive_more"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d751e9e49156b02b44f9c1815bcb94b984cdcc4396ecc32521c739452808b134"
+dependencies = [
+ "derive_more-impl 2.1.1",
 ]
 
 [[package]]
@@ -460,6 +546,18 @@ checksum = "cb7330aeadfbe296029522e6c40f315320aba36fc43a5b3632f3795348f3bd22"
 dependencies = [
  "proc-macro2",
  "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "derive_more-impl"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "799a97264921d8623a957f6c3b9011f3b5492f557bbb7a5a19b7fa6d06ba8dcb"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rustc_version",
  "syn 2.0.119",
 ]
 
@@ -1025,6 +1123,11 @@ checksum = "911aadae41ec99104efa865bd0b6e486b4b735999f9b571963748a46d16495ab"
 name = "esp-miner-rs"
 version = "0.1.0"
 dependencies = [
+ "bm1366",
+ "bm1397",
+ "bm13xx-chain",
+ "bm13xx-protocol",
+ "bounded-integer",
  "defmt 1.2.0",
  "defmt-rtt",
  "ds4432",
@@ -1034,6 +1137,7 @@ dependencies = [
  "embassy-net",
  "embassy-sync 0.8.0",
  "embassy-time",
+ "embedded-hal 1.0.0",
  "embedded-hal-async",
  "embedded-io 0.6.1",
  "embedded-io 0.7.1",
@@ -1046,8 +1150,10 @@ dependencies = [
  "esp-hal",
  "esp-radio",
  "esp-rtos",
+ "fugit 0.3.9",
  "heapless 0.8.0",
  "ina260",
+ "miner-core",
  "smoltcp",
  "static_cell",
  "stratum-v1",
@@ -1830,6 +1936,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
+name = "miner-core"
+version = "0.1.0"
+dependencies = [
+ "bitcoin_hashes",
+ "defmt 1.2.0",
+ "heapless 0.8.0",
+]
+
+[[package]]
 name = "nb"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2104,6 +2219,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustc_version"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92"
+dependencies = [
+ "semver",
+]
+
+[[package]]
 name = "rustversion"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2144,6 +2268,12 @@ name = "semihosting"
 version = "0.1.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8e4abf97879f4e80db69a9fba7bd64998e9bdad25f58ef045a778e191172fd4"
+
+[[package]]
+name = "semver"
+version = "1.0.28"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
 
 [[package]]
 name = "serde"
@@ -2293,7 +2423,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "50e099ec137196685dff06236cef5a54b14cf67e430e6a24a23c58c02f713fe2"
 dependencies = [
  "bitcoin_hashes",
- "derive_more",
+ "derive_more 1.0.0",
  "embedded-io-async 0.6.1",
  "faster-hex",
  "heapless 0.8.0",

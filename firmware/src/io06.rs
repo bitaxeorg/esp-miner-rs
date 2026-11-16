@@ -15,7 +15,13 @@ impl<T: embedded_io::ErrorType> embedded_io_06::ErrorType for Io06<T> {
 
 impl<T: embedded_io_async::Read> embedded_io_async_06::Read for Io06<T> {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        self.0.read(buf).await.map_err(|_| ErrorKind::Other)
+        match self.0.read(buf).await {
+            // stratum-v1 0.1 takes a 0 byte read for "no data yet": report the end of the stream
+            // as an error so the client notices the pool closed the connection.
+            Ok(0) if !buf.is_empty() => Err(ErrorKind::NotConnected),
+            Ok(n) => Ok(n),
+            Err(_) => Err(ErrorKind::Other),
+        }
     }
 }
 

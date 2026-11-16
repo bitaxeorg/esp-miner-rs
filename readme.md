@@ -10,9 +10,11 @@ and more to come.
 ## Architecture
 - `firmware/`: the `#[no_std]` firmware for the ESP32-S3 ([esp-hal] + [embassy]), built from its own directory
 - `miner-core/`: the hardware independent mining logic (block header, share check, job book, core voltage, fan curve), tested on the host
+- ASIC driver: [bm13xx-rs]
 
 [esp-hal]:https://github.com/esp-rs/esp-hal
 [embassy]:https://github.com/embassy-rs/embassy
+[bm13xx-rs]:https://github.com/GPTechinno/bm13xx-rs
 
 ## Setup
 

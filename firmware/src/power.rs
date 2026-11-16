@@ -1,73 +1,123 @@
-use defmt::debug;
+//! Core power, ASIC temperature and fan.
+
+use bounded_integer::BoundedU8;
+use defmt::{error, info, warn};
+use ds4432::{AsyncDS4432, Status};
+use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
+use embassy_sync::{
+    blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex},
+    signal::Signal,
+};
 use embassy_time::{Duration, Timer};
+use emc2101::AsyncEMC2101;
+use esp_hal::{gpio::Output, i2c::master::I2c, Async};
+use fugit::HertzU32;
+use ina260::AsyncINA260;
+use miner_core::{thermal, vcore};
 
-const TPS40305_VFB: f32 = 0.6;
-#[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
-const TPS40305_RA: f32 = 4990.0; // R14
-#[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
-const TPS40305_RB: f32 = 3320.0; // R15
+use crate::board;
 
-trait SetVCore {
-    async fn set_vcore(&mut self, vcore: f32);
-}
+/// A device on the shared I²C bus.
+pub type BusDevice = I2cDevice<'static, NoopRawMutex, I2c<'static, Async>>;
 
-#[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
-impl<I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType> SetVCore
-    for ds4432::AsyncDS4432<I>
-{
-    async fn set_vcore(&mut self, vcore: f32) {
-        let irb_ua = TPS40305_VFB * 1_000_000.0 / TPS40305_RB;
-        let ira_ua = (vcore - TPS40305_VFB) * 1_000_000.0 / TPS40305_RA;
-        let status = if irb_ua > ira_ua {
-            ds4432::Status::SourceMicroAmp(irb_ua - ira_ua)
-        } else {
-            ds4432::Status::SinkMicroAmp(ira_ua - irb_ua)
-        };
-        let _ = self.set_status(ds4432::Output::Zero, status).await;
-    }
-}
+/// Signaled once the core voltage is up, so the chips can be brought up.
+pub static POWER_READY: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
-trait MeasureVCore {
-    async fn measure_vcore(&mut self) -> Option<f32>;
-}
+const MONITOR_PERIOD: Duration = Duration::from_secs(5);
+/// Time for the regulator to settle after it is enabled.
+const VCORE_SETTLE: Duration = Duration::from_millis(100);
+const FAN_PWM_FREQ: HertzU32 = HertzU32::Hz(5806);
 
-#[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
-impl<I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType> MeasureVCore
-    for ina260::AsyncINA260<I>
-{
-    async fn measure_vcore(&mut self) -> Option<f32> {
-        self.voltage().await.map(|v| (v as f32) / 1_000_000.0).ok()
-    }
-}
-
-// trait MeasureICore {
-//     async fn measure_icore(&mut self) -> Option<f32>;
-// }
-
-// #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
-// impl<I: embedded_hal_async::i2c::I2c + embedded_hal_async::i2c::ErrorType> MeasureICore
-//     for ina260::AsyncINA260<I>
-// {
-//     async fn measure_icore(&mut self) -> Option<f32> {
-//         self.current().await.map(|v| (v as f32) / 1_000_000.0).ok()
-//     }
-// }
-
+/// Sets the core voltage, enables the regulator, then watches the ASIC temperature: drives the fan
+/// and cuts the core power above [`thermal::OVERHEAT_C`].
+///
+/// `asic_enable` is the regulator enable (PWR_EN), active low.
 #[embassy_executor::task]
-pub async fn vcore_task(
-    target_vcore: f32,
-    mut setter: impl SetVCore + 'static,
-    mut measurer: Option<impl MeasureVCore + 'static>,
+pub async fn power_task(
+    mut dac: AsyncDS4432<BusDevice>,
+    mut monitor: AsyncINA260<BusDevice>,
+    mut sensor: AsyncEMC2101<BusDevice>,
+    mut asic_enable: Output<'static>,
 ) {
-    debug!("start vcore task");
-    let mut delta = 0.0;
+    // full speed until the first temperature reading
+    if let Err(e) = sensor.set_fan_pwm(FAN_PWM_FREQ, false).await {
+        error!("fan PWM setup failed: {}", e);
+    }
+    set_fan(&mut sensor, 100).await;
+
+    // Set the DAC before enabling the regulator, so it starts at the target voltage instead of
+    // its nominal ~1.5 V.
+    let current_ua =
+        vcore::feedback_current_ua(board::VCORE, board::VCORE_RA_OHM, board::VCORE_RB_OHM);
+    let status = if current_ua >= 0.0 {
+        Status::SourceMicroAmp(current_ua)
+    } else {
+        Status::SinkMicroAmp(-current_ua)
+    };
+    if let Err(e) = dac.set_status(ds4432::Output::Zero, status).await {
+        error!(
+            "setting the core voltage failed, core power stays off: {}",
+            e
+        );
+        return;
+    }
+    asic_enable.set_low();
+    info!("core voltage set to {} V", board::VCORE);
+    Timer::after(VCORE_SETTLE).await;
+    POWER_READY.signal(());
+
     loop {
-        if let Some(measurer) = measurer.as_mut() {
-            if let Some(measured_vcore) = measurer.measure_vcore().await {
-                delta = measured_vcore - target_vcore;
-            }
+        Timer::after(MONITOR_PERIOD).await;
+
+        let temp = asic_temp(&mut sensor).await;
+        match (
+            monitor.power().await,
+            monitor.current().await,
+            monitor.voltage().await,
+        ) {
+            (Ok(mw), Ok(ua), Ok(uv)) => info!(
+                "ASIC {} °C, input {} mW ({} mV, {} mA)",
+                temp,
+                mw,
+                uv / 1000,
+                ua / 1000
+            ),
+            _ => warn!("ASIC {} °C, reading the INA260 failed", temp),
         }
-        setter.set_vcore(target_vcore + delta).await;
-        Timer::after(Duration::from_millis(1_000)).await;
+
+        if temp > thermal::OVERHEAT_C {
+            asic_enable.set_high();
+            set_fan(&mut sensor, 100).await;
+            error!(
+                "ASIC overheat ({} °C > {} °C): core power cut until reboot",
+                temp,
+                thermal::OVERHEAT_C
+            );
+            return;
+        }
+        set_fan(&mut sensor, thermal::fan_percent(temp)).await;
+    }
+}
+
+/// ASIC temperature (°C), NaN when it can't be read.
+async fn asic_temp(sensor: &mut AsyncEMC2101<BusDevice>) -> f32 {
+    let temp = if board::ASIC_TEMP_INTERNAL {
+        sensor.temp_internal().await.map(f32::from)
+    } else {
+        sensor.temp_external_precise().await
+    };
+    match temp {
+        Ok(t) => t + board::ASIC_TEMP_OFFSET_C,
+        Err(e) => {
+            error!("reading the ASIC temperature failed: {}", e);
+            f32::NAN
+        }
+    }
+}
+
+async fn set_fan(sensor: &mut AsyncEMC2101<BusDevice>, percent: u8) {
+    let step = BoundedU8::new(thermal::emc2101_fan_step(percent)).unwrap_or(BoundedU8::MAX);
+    if let Err(e) = sensor.set_fan_power(step).await {
+        error!("setting the fan to {}% failed: {}", percent, e);
     }
 }
