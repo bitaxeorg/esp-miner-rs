@@ -930,14 +930,14 @@ dependencies = [
 
 [[package]]
 name = "emc2101"
-version = "3.0.0"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec421c976776b90a7956b8569a3e603820eda872ab8bb9326a687ae1886e7eb5"
+checksum = "7997377a125ec572d3753b5e6567bc7756a5e3e273c60b6683eac0112527d1db"
 dependencies = [
  "bounded-integer",
  "defmt 1.2.0",
  "embedded-hal-async",
- "fugit 0.3.9",
+ "fugit 0.6.0",
  "heapless 0.9.3",
  "maybe-async-cfg2",
  "rustversion",
@@ -1151,6 +1151,7 @@ dependencies = [
  "esp-radio",
  "esp-rtos",
  "fugit 0.3.9",
+ "fugit 0.6.0",
  "heapless 0.8.0",
  "ina260",
  "miner-core",
@@ -1554,6 +1555,16 @@ name = "fugit"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e88e2d6927cbdbbbdc85fc550cee539e63ae0f76445f13094833f63bb65b62f5"
+dependencies = [
+ "defmt 1.2.0",
+ "gcd",
+]
+
+[[package]]
+name = "fugit"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60ee0e9ed8a394868ee05cde8705cbd8dbfc95f88e14a57134323e799bd3912a"
 dependencies = [
  "defmt 1.2.0",
  "gcd",

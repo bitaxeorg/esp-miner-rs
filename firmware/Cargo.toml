@@ -43,7 +43,7 @@ embedded-io-async = "0.7.0"
 # stratum-v1 0.1 still uses the embedded-io 0.6 traits, see src/io06.rs
 embedded-io-06 = { package = "embedded-io", version = "0.6.1" }
 embedded-io-async-06 = { package = "embedded-io-async", version = "0.6.1" }
-emc2101 = { version = "3.0.0", default-features = false, features = [
+emc2101 = { version = "4.0.0", default-features = false, features = [
     "async",
     "defmt",
 ] }
@@ -69,7 +69,9 @@ esp-rtos = { version = "0.4.0", features = [
     "esp-radio",
     "esp32s3",
 ] }
+# bm13xx-rs still uses fugit 0.3, emc2101 uses fugit 0.6
 fugit = "0.3.9"
+fugit-06 = { package = "fugit", version = "0.6.0" }
 # kept on 0.8: stratum-v1 0.1 API uses heapless 0.8 types
 heapless = { version = "0.8.0", default-features = false, features = [
     "defmt-03",
