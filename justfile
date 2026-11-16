@@ -8,3 +8,6 @@ build b:
 
 run b:
   cd firmware && cargo run --release --features=bitaxe-$b
+
+test:
+  cargo test

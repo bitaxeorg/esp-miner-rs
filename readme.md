@@ -8,7 +8,11 @@ ESP-Miner-rs is bitcoin miner firmware designed to run on the ESP32-S3 of variou
 and more to come.
 
 ## Architecture
-- Based on [esp-template](https://esp-rs.github.io/book/writing-your-own-application/generate-project-from-template.html#esp-template)
+- `firmware/`: the `#[no_std]` firmware for the ESP32-S3 ([esp-hal] + [embassy]), built from its own directory
+- `miner-core/`: the hardware independent mining logic (block header, share check, job book, core voltage, fan curve), tested on the host
+
+[esp-hal]:https://github.com/esp-rs/esp-hal
+[embassy]:https://github.com/embassy-rs/embassy
 
 ## Setup
 
@@ -34,11 +38,13 @@ dev profile can potentially be one or more orders of magnitude slower than relea
 - `just build max` to build esp-miner-rs for [BitaxeMax]
 - `just build ultra` to build esp-miner-rs for [BitaxeUltra]
 - `just run max` to build/flash/run esp-miner-rs for [BitaxeMax] on the connected hardware
+- `just test` to run the `miner-core` tests on the host
 
 ### Manually
 - `cd firmware`
 - `WIFI_SSID="my_ssid" WIFI_PASSWORD="my_password" cargo build --release --features=bitaxe-max`
 - `WIFI_SSID="my_ssid" WIFI_PASSWORD="my_password" cargo run --release --features=bitaxe-max`
+- `cargo test` from the repository root runs the `miner-core` tests on the host
 
 [BitaxeMax]:https://github.com/skot/bitaxe/tree/max-v2.3
 [BitaxeUltra]:https://github.com/skot/bitaxe/tree/ultra-204
