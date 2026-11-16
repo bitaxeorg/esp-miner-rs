@@ -69,9 +69,7 @@ smoltcp = { version = "0.12.0", default-features = false, features = [
     "socket-udp",
 ] }
 static_cell = { version = "2.1.0", features = ["nightly"] }
-stratum-v1 = { version = "0.1.0", features = [
-    "defmt-03",
-], git = "https://github.com/Foundation-Devices/foundation-rs.git", branch = "stratum-v1" }
+stratum-v1 = "0.1.0"
 
 [features]
 bitaxe-max = []

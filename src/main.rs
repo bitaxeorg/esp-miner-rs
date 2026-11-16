@@ -5,7 +5,7 @@
 mod variants;
 
 use core::{net::Ipv4Addr, str::FromStr};
-use defmt::{debug, error, info, trace};
+use defmt::{debug, error, info, trace, Debug2Format};
 use defmt_rtt as _;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
@@ -237,7 +237,7 @@ async fn stratum_v1_rx_task(
                 }
             }
             Err(e) => {
-                error!("Client receive_message error: {:?}", e);
+                error!("Client receive_message error: {:?}", Debug2Format(&e));
             }
         }
     }

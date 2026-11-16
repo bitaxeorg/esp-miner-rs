@@ -870,10 +870,10 @@ dependencies = [
 
 [[package]]
 name = "faster-hex"
-version = "0.9.0"
-source = "git+https://github.com/Georges760/faster-hex.git?branch=no-alloc-error-partialeq#9a4a5cf473d6a1540f92487689344f62b488dfd2"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7223ae2d2f179b803433d9c830478527e92b8117eab39460edae7f1614d9fb73"
 dependencies = [
- "defmt",
  "heapless",
 ]
 
@@ -1366,9 +1366,9 @@ dependencies = [
 [[package]]
 name = "serde-json-core"
 version = "0.6.0"
-source = "git+https://github.com/rust-embedded-community/serde-json-core.git?branch=master#ca6745785c6d315d532170a33bff826377c693c9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b81787e655bd59cecadc91f7b6b8651330b2be6c33246039a65e5cd6f4e0828"
 dependencies = [
- "defmt",
  "heapless",
  "ryu",
  "serde",
@@ -1426,10 +1426,10 @@ dependencies = [
 [[package]]
 name = "stratum-v1"
 version = "0.1.0"
-source = "git+https://github.com/Foundation-Devices/foundation-rs.git?branch=stratum-v1#87462a85a806cb3e647842ee96f31337b1e64afe"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50e099ec137196685dff06236cef5a54b14cf67e430e6a24a23c58c02f713fe2"
 dependencies = [
  "bitcoin_hashes",
- "defmt",
  "derive_more",
  "embedded-io-async",
  "faster-hex",
