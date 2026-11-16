@@ -33,9 +33,9 @@ jobs:
             args: --features=bitaxe-ultra --workspace -- -D warnings
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Setup Rust
-        uses: esp-rs/xtensa-toolchain@v1.5
+        uses: esp-rs/xtensa-toolchain@v1.7.0
         with:
           default: true
           buildtargets: esp32s3
