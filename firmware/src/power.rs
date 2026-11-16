@@ -11,7 +11,7 @@ use embassy_sync::{
 use embassy_time::{Duration, Timer};
 use emc2101::AsyncEMC2101;
 use esp_hal::{gpio::Output, i2c::master::I2c, Async};
-use fugit_06::HertzU32;
+use fugit::HertzU32;
 use ina260::AsyncINA260;
 use miner_core::{thermal, vcore};
 

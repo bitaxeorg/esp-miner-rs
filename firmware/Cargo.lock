@@ -126,43 +126,43 @@ dependencies = [
 
 [[package]]
 name = "bm1366"
-version = "0.2.0"
-source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=f295ee0481bd471e3a100c278461cd3d9d6ff21b#f295ee0481bd471e3a100c278461cd3d9d6ff21b"
+version = "0.3.0"
+source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=422df6f1953d9fb95b5c4ab39d35b234c216d6de#422df6f1953d9fb95b5c4ab39d35b234c216d6de"
 dependencies = [
  "bm13xx-asic",
  "bm13xx-protocol",
  "defmt 1.2.0",
- "fugit 0.3.9",
+ "fugit 0.6.0",
  "heapless 0.9.3",
 ]
 
 [[package]]
 name = "bm1397"
-version = "0.2.0"
-source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=f295ee0481bd471e3a100c278461cd3d9d6ff21b#f295ee0481bd471e3a100c278461cd3d9d6ff21b"
+version = "0.3.0"
+source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=422df6f1953d9fb95b5c4ab39d35b234c216d6de#422df6f1953d9fb95b5c4ab39d35b234c216d6de"
 dependencies = [
  "bm13xx-asic",
  "bm13xx-protocol",
  "defmt 1.2.0",
- "fugit 0.3.9",
+ "fugit 0.6.0",
  "heapless 0.9.3",
 ]
 
 [[package]]
 name = "bm13xx-asic"
-version = "0.2.0"
-source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=f295ee0481bd471e3a100c278461cd3d9d6ff21b#f295ee0481bd471e3a100c278461cd3d9d6ff21b"
+version = "0.3.0"
+source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=422df6f1953d9fb95b5c4ab39d35b234c216d6de#422df6f1953d9fb95b5c4ab39d35b234c216d6de"
 dependencies = [
  "bm13xx-protocol",
  "defmt 1.2.0",
  "derive_more 2.1.1",
- "fugit 0.3.9",
+ "fugit 0.6.0",
 ]
 
 [[package]]
 name = "bm13xx-chain"
-version = "0.2.0"
-source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=f295ee0481bd471e3a100c278461cd3d9d6ff21b#f295ee0481bd471e3a100c278461cd3d9d6ff21b"
+version = "0.3.0"
+source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=422df6f1953d9fb95b5c4ab39d35b234c216d6de#422df6f1953d9fb95b5c4ab39d35b234c216d6de"
 dependencies = [
  "bm13xx-asic",
  "bm13xx-protocol",
@@ -170,15 +170,15 @@ dependencies = [
  "derive_more 2.1.1",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
- "embedded-io-async 0.6.1",
- "fugit 0.3.9",
+ "embedded-io-async 0.7.0",
+ "fugit 0.6.0",
  "heapless 0.9.3",
 ]
 
 [[package]]
 name = "bm13xx-protocol"
-version = "0.2.0"
-source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=f295ee0481bd471e3a100c278461cd3d9d6ff21b#f295ee0481bd471e3a100c278461cd3d9d6ff21b"
+version = "0.3.0"
+source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=422df6f1953d9fb95b5c4ab39d35b234c216d6de#422df6f1953d9fb95b5c4ab39d35b234c216d6de"
 dependencies = [
  "crc",
  "defmt 1.2.0",
@@ -204,7 +204,7 @@ dependencies = [
  "embedded-io 0.7.1",
  "embedded-io-async 0.7.0",
  "futures-intrusive",
- "heapless 0.9.3",
+ "heapless 0.8.0",
 ]
 
 [[package]]
@@ -1150,7 +1150,6 @@ dependencies = [
  "esp-hal",
  "esp-radio",
  "esp-rtos",
- "fugit 0.3.9",
  "fugit 0.6.0",
  "heapless 0.8.0",
  "ina260",
@@ -1539,16 +1538,6 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
-
-[[package]]
-name = "fugit"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e639847d312d9a82d2e75b0edcc1e934efcc64e6cb7aa94f0b1fbec0bc231d6"
-dependencies = [
- "defmt 0.3.101",
- "gcd",
-]
 
 [[package]]
 name = "fugit"

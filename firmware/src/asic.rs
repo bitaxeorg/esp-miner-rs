@@ -31,7 +31,7 @@ const DEFAULT_BAUDRATE: u32 = 115_200;
 /// Enough for the 16 or 32 job ids the chain cycles through.
 const JOB_IDS: usize = 32;
 
-type UartError = <Uart<'static, Async> as embedded_io_06::ErrorType>::Error;
+type UartError = <Uart<'static, Async> as embedded_io::ErrorType>::Error;
 type ChainError = bm13xx_chain::Error<UartError, Infallible, Infallible>;
 
 /// The serial link to the chips, with the baudrate control bm13xx-chain needs.
@@ -54,29 +54,29 @@ impl AsicUart {
     }
 }
 
-impl embedded_io_06::ErrorType for AsicUart {
+impl embedded_io::ErrorType for AsicUart {
     type Error = UartError;
 }
 
-impl embedded_io_async_06::Read for AsicUart {
+impl embedded_io_async::Read for AsicUart {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        embedded_io_async_06::Read::read(&mut self.uart, buf).await
+        embedded_io_async::Read::read(&mut self.uart, buf).await
     }
 }
 
-impl embedded_io_06::ReadReady for AsicUart {
+impl embedded_io::ReadReady for AsicUart {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
-        embedded_io_06::ReadReady::read_ready(&mut self.uart)
+        embedded_io::ReadReady::read_ready(&mut self.uart)
     }
 }
 
-impl embedded_io_async_06::Write for AsicUart {
+impl embedded_io_async::Write for AsicUart {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        embedded_io_async_06::Write::write(&mut self.uart, buf).await
+        embedded_io_async::Write::write(&mut self.uart, buf).await
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
-        embedded_io_async_06::Write::flush(&mut self.uart).await
+        embedded_io_async::Write::flush(&mut self.uart).await
     }
 }
 
