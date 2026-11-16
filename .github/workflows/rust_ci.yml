@@ -14,9 +14,12 @@ env:
   WIFI_PASSWORD: TestPASSWORD
 
 jobs:
-  rust-checks:
-    name: Rust Checks
+  firmware-checks:
+    name: Firmware Checks
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware
     strategy:
       fail-fast: false
       matrix:
@@ -42,5 +45,7 @@ jobs:
           ldproxy: false
       - name: Enable caching
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: firmware
       - name: Run command
         run: cargo ${{ matrix.action.command }} ${{ matrix.action.args }}

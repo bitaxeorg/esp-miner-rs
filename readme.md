@@ -36,6 +36,7 @@ dev profile can potentially be one or more orders of magnitude slower than relea
 - `just run max` to build/flash/run esp-miner-rs for [BitaxeMax] on the connected hardware
 
 ### Manually
+- `cd firmware`
 - `WIFI_SSID="my_ssid" WIFI_PASSWORD="my_password" cargo build --release --features=bitaxe-max`
 - `WIFI_SSID="my_ssid" WIFI_PASSWORD="my_password" cargo run --release --features=bitaxe-max`
 
