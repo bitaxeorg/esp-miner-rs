@@ -75,8 +75,8 @@ heapless = { version = "0.8.0", default-features = false, features = [
     "defmt-03",
 ] }
 ina260 = { version = "0.4.0", features = [
-    "defmt-03",
-], git = "https://github.com/korbin/ina260.git" }
+    "defmt",
+], git = "https://github.com/Georges760/ina260.git", rev = "30dd697cf20ab7fc1f6e55d22823adf18afc86b0" }
 miner-core = { path = "../miner-core", features = ["defmt"] }
 smoltcp = { version = "0.13.0", default-features = false, features = [
     "medium-ethernet",

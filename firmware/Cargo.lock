@@ -1733,11 +1733,11 @@ dependencies = [
 [[package]]
 name = "ina260"
 version = "0.4.0"
-source = "git+https://github.com/korbin/ina260.git#fa0554a683ee13c1898d27d1dc7cc91284c1bc5e"
+source = "git+https://github.com/Georges760/ina260.git?rev=30dd697cf20ab7fc1f6e55d22823adf18afc86b0#30dd697cf20ab7fc1f6e55d22823adf18afc86b0"
 dependencies = [
- "defmt 0.3.101",
+ "defmt 1.2.0",
  "embedded-hal-async",
- "maybe-async-cfg",
+ "maybe-async-cfg2",
 ]
 
 [[package]]
@@ -1905,18 +1905,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "maybe-async-cfg"
-version = "0.2.5"
-source = "git+https://github.com/korbin/maybe-async-cfg#ebb14ba121714acd2118b12ae3f01f16cd013138"
-dependencies = [
- "manyhow",
- "proc-macro2",
- "pulldown-cmark 0.11.3",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "maybe-async-cfg2"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1924,7 +1912,7 @@ checksum = "9df1f5459b0b8b64cccd0986c29cce07056b3351828eeee9008674aaf4e3de28"
 dependencies = [
  "manyhow",
  "proc-macro2",
- "pulldown-cmark 0.13.6",
+ "pulldown-cmark",
  "quote",
  "syn 1.0.109",
 ]
@@ -2078,17 +2066,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "pulldown-cmark"
-version = "0.11.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "679341d22c78c6c649893cbd6c3278dcbe9fc4faa62fea3a9296ae2b50c14625"
-dependencies = [
- "bitflags 2.13.2",
- "memchr",
- "unicase",
 ]
 
 [[package]]
