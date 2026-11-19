@@ -3,13 +3,13 @@
 //! - `vcore-dac` (Max, Ultra up to 205, Supra 400/401): a TPS40305 buck whose output a DS4432
 //!   current DAC moves through its feedback node, enabled by PWR_EN (active low), with an INA260
 //!   on the 5 V input.
-//! - `vcore-tps546` (Ultra 207, Supra 402 and later, Gamma): a TPS546D24A buck driven over PMBus,
-//!   which also measures its input, output and temperature.
+//! - `vcore-tps546` (Ultra 207, Supra 402 and later, Gamma, GammaTurbo): a TPS546D24A buck, or a
+//!   stack of them, driven over PMBus, which also measures its input, output and temperature.
 
 #[cfg(feature = "vcore-dac")]
 pub use dac::Vcore;
 #[cfg(feature = "vcore-tps546")]
-pub use pmbus::{Tps546Config, Vcore};
+pub use pmbus::{PhaseCount, Tps546Config, Vcore};
 
 #[cfg(feature = "vcore-dac")]
 mod dac {
@@ -90,8 +90,10 @@ mod pmbus {
     use embassy_time::{Duration, Timer};
     use pmbus_adapter::PmbusAdaptor;
     use smbus_adapter::SmbusAdaptor;
+    pub use tps546::PhaseCount;
     use tps546::{
-        OnOffConfig, Operation, PhaseCount, PinDetectOverride, StackConfig, SyncConfig, Tps546,
+        CompensationConfig, OnOffConfig, Operation, PinDetectOverride, StackConfig, SyncConfig,
+        Tps546,
     };
 
     use crate::{board, power::BusDevice};
@@ -130,6 +132,14 @@ mod pmbus {
 
     /// Board-specific TPS546 settings (V, A).
     pub struct Tps546Config {
+        /// PHASE: 0x00 for a single TPS546, 0xFF for every phase of a stack.
+        pub phase: u8,
+        /// Phases of the stack.
+        pub stack: PhaseCount,
+        /// SYNC_CONFIG raw value.
+        pub sync: u8,
+        /// COMPENSATION_CONFIG, `None` to keep the pin-detected one.
+        pub compensation: Option<[u8; 5]>,
         pub vin_on: f32,
         pub vin_off: f32,
         pub vin_uv_warn: Option<f32>,
@@ -241,12 +251,17 @@ mod pmbus {
             // power conversion follows OPERATION only
             tps.set_on_off_config(OnOffConfig::from_raw(0x1B)).await?;
             tps.set_stack_config(StackConfig {
-                phase_count: PhaseCount::Single,
+                phase_count: config.stack,
             })
             .await?;
-            tps.set_sync_config(SyncConfig::from_raw(0x10)).await?;
-            tps.set_phase(0x00).await?;
+            tps.set_sync_config(SyncConfig::from_raw(config.sync))
+                .await?;
+            tps.set_phase(config.phase).await?;
             tps.set_frequency_switch(SWITCH_FREQ_KHZ).await?;
+            if let Some(compensation) = config.compensation {
+                tps.set_compensation_config(CompensationConfig::from_bytes(compensation))
+                    .await?;
+            }
 
             if let Some(limit) = config.vin_uv_warn {
                 tps.set_vin_uv_warn_limit(limit).await?;

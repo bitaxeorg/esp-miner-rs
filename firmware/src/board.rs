@@ -16,13 +16,14 @@ const BOARD_FEATURES: usize = cfg!(feature = "bitaxe-102") as usize
     + cfg!(feature = "bitaxe-600") as usize
     + cfg!(feature = "bitaxe-601") as usize
     + cfg!(feature = "bitaxe-602") as usize
-    + cfg!(feature = "bitaxe-603") as usize;
+    + cfg!(feature = "bitaxe-603") as usize
+    + cfg!(feature = "bitaxe-801") as usize;
 const _: () = assert!(
     BOARD_FEATURES == 1,
     "You must activate exactly one board feature: a board number (bitaxe-102, bitaxe-201, \
      bitaxe-202, bitaxe-205, bitaxe-207, bitaxe-400, bitaxe-401, bitaxe-402, bitaxe-403, \
-     bitaxe-600, bitaxe-601, bitaxe-602, bitaxe-603) or a family name (bitaxe-max, bitaxe-ultra, \
-     bitaxe-supra, bitaxe-gamma)"
+     bitaxe-600, bitaxe-601, bitaxe-602, bitaxe-603, bitaxe-801) or a family name (bitaxe-max, \
+     bitaxe-ultra, bitaxe-supra, bitaxe-gamma, bitaxe-gamma-turbo)"
 );
 
 /// ASIC driver.
@@ -69,10 +70,11 @@ pub const ROLLED_VERSIONS: f32 = 65_536.0;
 
 /// The ASIC temperature comes from the EMC2101 internal sensor plus an offset, or from the chip's
 /// diode on the EMC2101 external channel.
+#[cfg(feature = "fan-emc2101")]
 pub const ASIC_TEMP_INTERNAL: bool = cfg!(feature = "asic-temp-internal");
 #[cfg(feature = "asic-temp-internal")]
 pub const ASIC_TEMP_OFFSET_C: f32 = 5.0;
-#[cfg(not(feature = "asic-temp-internal"))]
+#[cfg(all(feature = "fan-emc2101", not(feature = "asic-temp-internal")))]
 pub const ASIC_TEMP_OFFSET_C: f32 = 0.0;
 
 /// EMC2101 external diode settings for the chip's diode: ideality factor and beta compensation
@@ -84,13 +86,20 @@ pub const ASIC_TEMP_OFFSET_C: f32 = 0.0;
     feature = "bitaxe-603"
 ))]
 pub const EMC2101_DIODE: Option<(u8, u8)> = Some((0x24, 0x00));
-#[cfg(not(any(
-    feature = "bitaxe-600",
-    feature = "bitaxe-601",
-    feature = "bitaxe-602",
-    feature = "bitaxe-603"
-)))]
+#[cfg(all(
+    feature = "fan-emc2101",
+    not(any(
+        feature = "bitaxe-600",
+        feature = "bitaxe-601",
+        feature = "bitaxe-602",
+        feature = "bitaxe-603"
+    ))
+))]
 pub const EMC2101_DIODE: Option<(u8, u8)> = None;
+
+/// Whether External Diode 1 of the EMC2103 is on the second chip of the chain instead of the first.
+#[cfg(feature = "bitaxe-801")]
+pub const EMC2103_TEMP_FLIP: bool = true;
 
 /// TPS40305 feedback divider: RA (R14) and RB (R15).
 #[cfg(feature = "vcore-dac")]
@@ -109,8 +118,12 @@ pub const DS4432_RFS0_OHM: u32 = 80_000;
 pub const DS4432_RFS0_OHM: u32 = 80_600;
 
 /// TPS546 settings for the 5 V input, single phase.
-#[cfg(feature = "vcore-tps546")]
+#[cfg(all(feature = "vcore-tps546", not(feature = "bitaxe-801")))]
 pub const TPS546: crate::vcore::Tps546Config = crate::vcore::Tps546Config {
+    phase: 0x00,
+    stack: crate::vcore::PhaseCount::Single,
+    sync: 0x10,
+    compensation: None,
     vin_on: 4.8,
     vin_off: 4.5,
     vin_uv_warn: None,
@@ -120,6 +133,23 @@ pub const TPS546: crate::vcore::Tps546Config = crate::vcore::Tps546Config {
     vout_max: 2.0,
     iout_oc_warn: 25.0,
     iout_oc_fault: 30.0,
+};
+/// TPS546 settings for the 12 V input, two phases with SYNC auto-detected.
+#[cfg(feature = "bitaxe-801")]
+pub const TPS546: crate::vcore::Tps546Config = crate::vcore::Tps546Config {
+    phase: 0xFF,
+    stack: crate::vcore::PhaseCount::TwoPhase,
+    sync: 0xD0,
+    compensation: Some([0x12, 0x34, 0x42, 0x21, 0x04]),
+    vin_on: 11.0,
+    vin_off: 10.5,
+    vin_uv_warn: Some(11.0),
+    vin_ov_fault: 14.8,
+    vout_scale_loop: 0.25,
+    vout_min: 1.0,
+    vout_max: 3.0,
+    iout_oc_warn: 50.0,
+    iout_oc_fault: 55.0,
 };
 
 /// ASIC difficulty (ticket mask): chips only report nonces at least this difficult.

@@ -3,6 +3,7 @@
 
 mod asic;
 mod board;
+mod cooling;
 mod io06;
 mod pool;
 mod power;
@@ -57,8 +58,8 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
-    // Power on I2C0 (SDA GPIO47, SCL GPIO48): the core regulator (see `vcore`) and the EMC2101
-    // (ASIC temperature, fan).
+    // Power on I2C0 (SDA GPIO47, SCL GPIO48): the core regulator (see `vcore`) and the fan
+    // controller, which also reads the ASIC temperature (see `cooling`).
     static I2C_BUS: StaticCell<Mutex<NoopRawMutex, I2c<'_, esp_hal::Async>>> = StaticCell::new();
     let i2c = I2c::new(
         peripherals.I2C0,
@@ -83,10 +84,19 @@ async fn main(spawner: Spawner) -> ! {
     // TPS546 over PMBus, off until the power task has configured it.
     #[cfg(feature = "vcore-tps546")]
     let vcore = vcore::Vcore::new(I2cDevice::new(i2c_bus));
-    let emc2101 = emc2101::AsyncEMC2101::new(I2cDevice::new(i2c_bus))
-        .await
-        .unwrap();
-    spawner.spawn(power::power_task(vcore, emc2101).unwrap());
+    #[cfg(feature = "fan-emc2101")]
+    let cooling = cooling::Cooling::new(
+        emc2101::AsyncEMC2101::new(I2cDevice::new(i2c_bus))
+            .await
+            .unwrap(),
+    );
+    #[cfg(feature = "fan-emc2103")]
+    let cooling = cooling::Cooling::new(
+        emc2103::AsyncEMC2103::new(I2cDevice::new(i2c_bus))
+            .await
+            .unwrap(),
+    );
+    spawner.spawn(power::power_task(vcore, cooling).unwrap());
 
     // ASIC chain: UART1 (TX GPIO17, RX GPIO18), NRST on GPIO1 (active low).
     let uart_config = uart::Config::default().with_baudrate(115_200);

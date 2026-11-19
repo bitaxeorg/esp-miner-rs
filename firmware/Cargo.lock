@@ -975,6 +975,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "emc2103"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3585c13f5e52429889b2503e3df3476561656cb2dcf38942ee1b9222db070a72"
+dependencies = [
+ "bounded-integer",
+ "defmt 1.2.0",
+ "embedded-hal-async",
+ "fugit 0.6.0",
+ "maybe-async-cfg2",
+ "rustversion",
+]
+
+[[package]]
 name = "enumset"
 version = "1.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1177,6 +1191,7 @@ dependencies = [
  "embedded-io-async 0.6.1",
  "embedded-io-async 0.7.0",
  "emc2101",
+ "emc2103",
  "esp-alloc",
  "esp-backtrace",
  "esp-bootloader-esp-idf",
