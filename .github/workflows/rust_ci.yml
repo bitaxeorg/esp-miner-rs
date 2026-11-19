@@ -14,6 +14,40 @@ env:
   WIFI_PASSWORD: TestPASSWORD
 
 jobs:
+  firmware-build:
+    name: Firmware Build (bitaxe-${{ matrix.board }})
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every board number; the family names are aliases of some of them.
+        board: [102, 201, 202, 205, 207, 400, 401, 402, 403, 600, 601, 602, 603]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Setup Rust
+        uses: esp-rs/xtensa-toolchain@v1.7.0
+        with:
+          default: true
+          buildtargets: esp32s3
+          ldproxy: false
+      - name: Enable caching
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: firmware
+          key: bitaxe-${{ matrix.board }}
+      - name: Build
+        run: cargo build --release --features=bitaxe-${{ matrix.board }}
+      - name: Upload firmware
+        uses: actions/upload-artifact@v7
+        with:
+          name: esp-miner-rs-bitaxe-${{ matrix.board }}
+          path: firmware/target/xtensa-esp32s3-none-elf/release/esp-miner-rs
+          if-no-files-found: error
+
   firmware-checks:
     name: Firmware Checks
     runs-on: ubuntu-latest
@@ -24,16 +58,10 @@ jobs:
       fail-fast: false
       matrix:
         action:
-          - command: build
-            args: --release --features=bitaxe-max
-          - command: build
-            args: --release --features=bitaxe-ultra
-          - command: build
-            args: --release --features=bitaxe-supra
-          - command: build
-            args: --release --features=bitaxe-gamma
           - command: fmt
             args: --all -- --check --color always
+          # One per code path: the family names, plus the DAC boards reading the EMC2101 internal
+          # sensor.
           - command: clippy
             args: --features=bitaxe-max --workspace -- -D warnings
           - command: clippy
@@ -42,6 +70,10 @@ jobs:
             args: --features=bitaxe-supra --workspace -- -D warnings
           - command: clippy
             args: --features=bitaxe-gamma --workspace -- -D warnings
+          - command: clippy
+            args: --features=bitaxe-205 --workspace -- -D warnings
+          - command: clippy
+            args: --features=bitaxe-401 --workspace -- -D warnings
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
