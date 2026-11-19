@@ -138,6 +138,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bm1370"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74b5cc7033b64920a64f3db65321b8c2c8c544d5c41ddd983a8f032a1ac12735"
+dependencies = [
+ "bm13xx-asic",
+ "bm13xx-protocol",
+ "defmt 1.2.0",
+ "fugit 0.6.0",
+ "heapless 0.9.3",
+]
+
+[[package]]
 name = "bm1397"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1129,6 +1142,7 @@ name = "esp-miner-rs"
 version = "0.1.0"
 dependencies = [
  "bm1366",
+ "bm1370",
  "bm1397",
  "bm13xx-chain",
  "bm13xx-protocol",
@@ -1159,9 +1173,12 @@ dependencies = [
  "heapless 0.8.0",
  "ina260",
  "miner-core",
+ "pmbus-adapter",
+ "smbus-adapter",
  "smoltcp",
  "static_cell",
  "stratum-v1",
+ "tps546",
 ]
 
 [[package]]
@@ -2009,6 +2026,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
+name = "pmbus-adapter"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63464d412ff58112d17c1c4792955dd24b8c9525ec7c6dfefe0254d34346273a"
+dependencies = [
+ "bitflags 2.13.2",
+ "embedded-hal-async",
+ "heapless 0.8.0",
+ "smbus-adapter",
+]
+
+[[package]]
 name = "portable-atomic"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2344,6 +2373,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "149309498a5f7334b12ddae0cad8aba81ce785fe91755068867e017cf98fee46"
 
 [[package]]
+name = "smbus-adapter"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ba1c0f7d9a1b8ddaa7b4451d8047b59c34abca29503325475d7cb72e7fca6ea"
+dependencies = [
+ "embedded-hal-async",
+ "heapless 0.8.0",
+]
+
+[[package]]
 name = "smoltcp"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2545,6 +2584,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baa693a8032d7e1cada7d0041e96126df243179ff061456783ac7f12bda4744c"
 dependencies = [
  "winnow",
+]
+
+[[package]]
+name = "tps546"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19ac4668dac2396c09cfe0031d614e69c8282444ec8738e4586235ae5e5819e9"
+dependencies = [
+ "bitflags 2.13.2",
+ "embedded-hal-async",
+ "heapless 0.8.0",
+ "pmbus-adapter",
 ]
 
 [[package]]

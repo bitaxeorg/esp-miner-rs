@@ -28,12 +28,16 @@ jobs:
             args: --release --features=bitaxe-max
           - command: build
             args: --release --features=bitaxe-ultra
+          - command: build
+            args: --release --features=bitaxe-gamma
           - command: fmt
             args: --all -- --check --color always
           - command: clippy
             args: --features=bitaxe-max --workspace -- -D warnings
           - command: clippy
             args: --features=bitaxe-ultra --workspace -- -D warnings
+          - command: clippy
+            args: --features=bitaxe-gamma --workspace -- -D warnings
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

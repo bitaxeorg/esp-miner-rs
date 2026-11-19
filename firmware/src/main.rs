@@ -6,6 +6,7 @@ mod board;
 mod io06;
 mod pool;
 mod power;
+mod vcore;
 
 use defmt::{debug, error, info};
 use defmt_rtt as _;
@@ -56,9 +57,8 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
-    // Power: DS4432 (core voltage), INA260 (input power) and EMC2101 (ASIC temperature, fan) on
-    // I2C0 (SDA GPIO47, SCL GPIO48). The regulator enable (PWR_EN, GPIO10) is active low: off
-    // until the power task has set the core voltage.
+    // Power on I2C0 (SDA GPIO47, SCL GPIO48): the core regulator (see `vcore`) and the EMC2101
+    // (ASIC temperature, fan).
     static I2C_BUS: StaticCell<Mutex<NoopRawMutex, I2c<'_, esp_hal::Async>>> = StaticCell::new();
     let i2c = I2c::new(
         peripherals.I2C0,
@@ -69,17 +69,24 @@ async fn main(spawner: Spawner) -> ! {
     .with_scl(peripherals.GPIO48)
     .into_async();
     let i2c_bus = I2C_BUS.init(Mutex::new(i2c));
-    let ds4432 =
+    // DS4432 (core voltage) and INA260 (input power). The regulator enable (PWR_EN, GPIO10) is
+    // active low: off until the power task has set the core voltage.
+    #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
+    let vcore = vcore::Vcore::new(
         ds4432::AsyncDS4432::with_rfs(I2cDevice::new(i2c_bus), Some(board::DS4432_RFS0_OHM), None)
-            .unwrap();
-    let ina260 = ina260::AsyncINA260::new(I2cDevice::new(i2c_bus))
-        .await
-        .unwrap();
+            .unwrap(),
+        ina260::AsyncINA260::new(I2cDevice::new(i2c_bus))
+            .await
+            .unwrap(),
+        Output::new(peripherals.GPIO10, Level::High, OutputConfig::default()),
+    );
+    // TPS546 over PMBus, off until the power task has configured it.
+    #[cfg(feature = "bitaxe-gamma")]
+    let vcore = vcore::Vcore::new(I2cDevice::new(i2c_bus));
     let emc2101 = emc2101::AsyncEMC2101::new(I2cDevice::new(i2c_bus))
         .await
         .unwrap();
-    let asic_enable = Output::new(peripherals.GPIO10, Level::High, OutputConfig::default());
-    spawner.spawn(power::power_task(ds4432, ina260, emc2101, asic_enable).unwrap());
+    spawner.spawn(power::power_task(vcore, emc2101).unwrap());
 
     // ASIC chain: UART1 (TX GPIO17, RX GPIO18), NRST on GPIO1 (active low).
     let uart_config = uart::Config::default().with_baudrate(115_200);

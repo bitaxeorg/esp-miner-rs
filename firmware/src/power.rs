@@ -1,21 +1,19 @@
 //! Core power, ASIC temperature and fan.
 
 use bounded_integer::BoundedU8;
-use defmt::{error, info, warn};
-use ds4432::{AsyncDS4432, Status};
+use defmt::{error, info};
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_sync::{
     blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex},
     signal::Signal,
 };
 use embassy_time::{Duration, Timer};
-use emc2101::AsyncEMC2101;
-use esp_hal::{gpio::Output, i2c::master::I2c, Async};
+use emc2101::{AsyncEMC2101, BetaCompensation};
+use esp_hal::{i2c::master::I2c, Async};
 use fugit::HertzU32;
-use ina260::AsyncINA260;
-use miner_core::{thermal, vcore};
+use miner_core::thermal;
 
-use crate::board;
+use crate::{board, vcore::Vcore};
 
 /// A device on the shared I²C bus.
 pub type BusDevice = I2cDevice<'static, NoopRawMutex, I2c<'static, Async>>;
@@ -28,41 +26,23 @@ const MONITOR_PERIOD: Duration = Duration::from_secs(5);
 const VCORE_SETTLE: Duration = Duration::from_millis(100);
 const FAN_PWM_FREQ: HertzU32 = HertzU32::Hz(5806);
 
-/// Sets the core voltage, enables the regulator, then watches the ASIC temperature: drives the fan
-/// and cuts the core power above [`thermal::OVERHEAT_C`].
-///
-/// `asic_enable` is the regulator enable (PWR_EN), active low.
+/// Turns the core power on, then watches the ASIC temperature: drives the fan and cuts the core
+/// power above [`thermal::OVERHEAT_C`].
 #[embassy_executor::task]
-pub async fn power_task(
-    mut dac: AsyncDS4432<BusDevice>,
-    mut monitor: AsyncINA260<BusDevice>,
-    mut sensor: AsyncEMC2101<BusDevice>,
-    mut asic_enable: Output<'static>,
-) {
+pub async fn power_task(mut vcore: Vcore, mut sensor: AsyncEMC2101<BusDevice>) {
     // full speed until the first temperature reading
     if let Err(e) = sensor.set_fan_pwm(FAN_PWM_FREQ, false).await {
         error!("fan PWM setup failed: {}", e);
     }
     set_fan(&mut sensor, 100).await;
+    if let Some((ideality, beta)) = board::EMC2101_DIODE {
+        configure_diode(&mut sensor, ideality, beta).await;
+    }
 
-    // Set the DAC before enabling the regulator, so it starts at the target voltage instead of
-    // its nominal ~1.5 V.
-    let current_ua =
-        vcore::feedback_current_ua(board::VCORE, board::VCORE_RA_OHM, board::VCORE_RB_OHM);
-    let status = if current_ua >= 0.0 {
-        Status::SourceMicroAmp(current_ua)
-    } else {
-        Status::SinkMicroAmp(-current_ua)
-    };
-    if let Err(e) = dac.set_status(ds4432::Output::Zero, status).await {
-        error!(
-            "setting the core voltage failed, core power stays off: {}",
-            e
-        );
+    if !vcore.on(board::VCORE).await {
+        error!("core power stays off");
         return;
     }
-    asic_enable.set_low();
-    info!("core voltage set to {} V", board::VCORE);
     Timer::after(VCORE_SETTLE).await;
     POWER_READY.signal(());
 
@@ -70,23 +50,10 @@ pub async fn power_task(
         Timer::after(MONITOR_PERIOD).await;
 
         let temp = asic_temp(&mut sensor).await;
-        match (
-            monitor.power().await,
-            monitor.current().await,
-            monitor.voltage().await,
-        ) {
-            (Ok(mw), Ok(ua), Ok(uv)) => info!(
-                "ASIC {} °C, input {} mW ({} mV, {} mA)",
-                temp,
-                mw,
-                uv / 1000,
-                ua / 1000
-            ),
-            _ => warn!("ASIC {} °C, reading the INA260 failed", temp),
-        }
+        vcore.log(temp).await;
 
         if temp > thermal::OVERHEAT_C {
-            asic_enable.set_high();
+            vcore.off().await;
             set_fan(&mut sensor, 100).await;
             error!(
                 "ASIC overheat ({} °C > {} °C): core power cut until reboot",
@@ -97,6 +64,29 @@ pub async fn power_task(
         }
         set_fan(&mut sensor, thermal::fan_percent(temp)).await;
     }
+}
+
+/// Sets the EMC2101 external diode ideality factor and beta compensation to the chip's diode.
+async fn configure_diode(sensor: &mut AsyncEMC2101<BusDevice>, ideality: u8, beta: u8) {
+    let (Some(ideality), Ok(beta)) = (BoundedU8::new(ideality), BetaCompensation::try_from(beta))
+    else {
+        error!(
+            "invalid EMC2101 diode settings: ideality {:x}, beta {:x}",
+            ideality, beta
+        );
+        return;
+    };
+    if let Err(e) = sensor.set_ideality_factor(ideality).await {
+        error!("setting the EMC2101 ideality factor failed: {}", e);
+    }
+    if let Err(e) = sensor.set_beta_compensation(beta).await {
+        error!("setting the EMC2101 beta compensation failed: {}", e);
+    }
+    info!(
+        "EMC2101 diode: ideality {:x}, beta {:x}",
+        ideality.get(),
+        beta as u8
+    );
 }
 
 /// ASIC temperature (°C), NaN when it can't be read.
