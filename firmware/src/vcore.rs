@@ -1,16 +1,17 @@
 //! Core voltage regulator.
 //!
-//! - Max and Ultra: a TPS40305 buck whose output a DS4432 current DAC moves through its feedback
-//!   node, enabled by PWR_EN (active low), with an INA260 on the 5 V input.
-//! - Supra (402 and later) and Gamma: a TPS546D24A buck driven over PMBus, which also measures
-//!   its input, output and temperature.
+//! - `vcore-dac` (Max, Ultra up to 205, Supra 400/401): a TPS40305 buck whose output a DS4432
+//!   current DAC moves through its feedback node, enabled by PWR_EN (active low), with an INA260
+//!   on the 5 V input.
+//! - `vcore-tps546` (Ultra 207, Supra 402 and later, Gamma): a TPS546D24A buck driven over PMBus,
+//!   which also measures its input, output and temperature.
 
-#[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
+#[cfg(feature = "vcore-dac")]
 pub use dac::Vcore;
-#[cfg(any(feature = "bitaxe-supra", feature = "bitaxe-gamma"))]
+#[cfg(feature = "vcore-tps546")]
 pub use pmbus::{Tps546Config, Vcore};
 
-#[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
+#[cfg(feature = "vcore-dac")]
 mod dac {
     use defmt::{error, info, warn};
     use ds4432::{AsyncDS4432, Status};
@@ -83,7 +84,7 @@ mod dac {
     }
 }
 
-#[cfg(any(feature = "bitaxe-supra", feature = "bitaxe-gamma"))]
+#[cfg(feature = "vcore-tps546")]
 mod pmbus {
     use defmt::{error, info, warn};
     use embassy_time::{Duration, Timer};

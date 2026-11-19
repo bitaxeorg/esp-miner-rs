@@ -71,7 +71,7 @@ async fn main(spawner: Spawner) -> ! {
     let i2c_bus = I2C_BUS.init(Mutex::new(i2c));
     // DS4432 (core voltage) and INA260 (input power). The regulator enable (PWR_EN, GPIO10) is
     // active low: off until the power task has set the core voltage.
-    #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
+    #[cfg(feature = "vcore-dac")]
     let vcore = vcore::Vcore::new(
         ds4432::AsyncDS4432::with_rfs(I2cDevice::new(i2c_bus), Some(board::DS4432_RFS0_OHM), None)
             .unwrap(),
@@ -81,7 +81,7 @@ async fn main(spawner: Spawner) -> ! {
         Output::new(peripherals.GPIO10, Level::High, OutputConfig::default()),
     );
     // TPS546 over PMBus, off until the power task has configured it.
-    #[cfg(any(feature = "bitaxe-supra", feature = "bitaxe-gamma"))]
+    #[cfg(feature = "vcore-tps546")]
     let vcore = vcore::Vcore::new(I2cDevice::new(i2c_bus));
     let emc2101 = emc2101::AsyncEMC2101::new(I2cDevice::new(i2c_bus))
         .await

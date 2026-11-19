@@ -96,22 +96,38 @@ stratum-v1 = "0.1.0"
 tps546 = { version = "0.1.0", optional = true }
 
 [features]
-bitaxe-max = ["dep:bm1397", "dep:ds4432", "dep:emc2101", "dep:ina260"]
-bitaxe-ultra = ["dep:bm1366", "dep:ds4432", "dep:emc2101", "dep:ina260"]
-bitaxe-supra = [
-    "dep:bm1368",
-    "dep:emc2101",
-    "dep:pmbus-adapter",
-    "dep:smbus-adapter",
-    "dep:tps546",
-]
-bitaxe-gamma = [
-    "dep:bm1370",
-    "dep:emc2101",
-    "dep:pmbus-adapter",
-    "dep:smbus-adapter",
-    "dep:tps546",
-]
+# A board by its number, as printed on it: exactly one (see src/board.rs). Each enables the
+# board's parts listed at the end.
+bitaxe-102 = ["asic-bm1397", "fan-emc2101", "vcore-dac"]
+bitaxe-201 = ["asic-bm1366", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
+bitaxe-202 = ["asic-bm1366", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
+bitaxe-205 = ["asic-bm1366", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
+bitaxe-207 = ["asic-bm1366", "fan-emc2101", "vcore-tps546"]
+bitaxe-400 = ["asic-bm1368", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
+bitaxe-401 = ["asic-bm1368", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
+bitaxe-402 = ["asic-bm1368", "fan-emc2101", "vcore-tps546"]
+bitaxe-403 = ["asic-bm1368", "fan-emc2101", "vcore-tps546"]
+bitaxe-600 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
+bitaxe-601 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
+bitaxe-602 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
+bitaxe-603 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
+# A board by its name: the latest revision of the family.
+bitaxe-max = ["bitaxe-102"]
+bitaxe-ultra = ["bitaxe-207"]
+bitaxe-supra = ["bitaxe-403"]
+bitaxe-gamma = ["bitaxe-603"]
+# Board parts, enabled by the board features above, not meant to be selected directly.
+asic-bm1366 = ["dep:bm1366"]
+asic-bm1368 = ["dep:bm1368"]
+asic-bm1370 = ["dep:bm1370"]
+asic-bm1397 = ["dep:bm1397"]
+# ASIC temperature from the EMC2101 internal sensor plus an offset, instead of the chip's diode.
+asic-temp-internal = []
+fan-emc2101 = ["dep:emc2101"]
+# TPS40305 buck moved by a DS4432 current DAC, INA260 on the input, PWR_EN.
+vcore-dac = ["dep:ds4432", "dep:ina260"]
+# TPS546D24A buck over PMBus.
+vcore-tps546 = ["dep:pmbus-adapter", "dep:smbus-adapter", "dep:tps546"]
 
 [profile.dev]
 # Rust debug is too slow.
