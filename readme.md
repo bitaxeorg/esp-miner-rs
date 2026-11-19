@@ -45,9 +45,13 @@ This is a proof of concept:
 ## Setup
 
 ### Nix user
+`flake.nix` provides everything: the Xtensa `esp` Rust toolchain, `espflash`, `probe-rs` and
+`just`. CI builds with it too.
 ```bash
-nix-shell
+nix develop
 ```
+or, with [direnv](https://direnv.net), `use flake` in your `.envrc`, next to your machine-specific
+values (`WIFI_SSID`, `WIFI_PASSWORD`, `PROBE_RS_PROBE`).
 
 ### Other
 - install [rust](https://esp-rs.github.io/book/installation/installation.html#rust-installation)

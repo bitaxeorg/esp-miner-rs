@@ -3,10 +3,12 @@ name: Continuous Integration
 on:
   push:
     paths-ignore:
-      - "**/README.md"
+      - "**/readme.md"
   pull_request:
   workflow_dispatch:
 
+# Every job runs in the dev shell of flake.nix (the esp toolchain, also for the host checks). The
+# Nix store is restored from the cache saved by the host checks.
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -28,12 +30,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-      - name: Setup Rust
-        uses: esp-rs/xtensa-toolchain@v1.7.0
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+      - name: Restore the Nix store
+        uses: nix-community/cache-nix-action@v7
         with:
-          default: true
-          buildtargets: esp32s3
-          ldproxy: false
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.nix', 'flake.lock') }}
+          save: false
+      - name: Enter the flake dev shell
+        uses: nicknovitski/nix-develop@v1
       - name: Enable caching
         uses: Swatinem/rust-cache@v2
         with:
@@ -83,12 +88,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-      - name: Setup Rust
-        uses: esp-rs/xtensa-toolchain@v1.7.0
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+      - name: Restore the Nix store
+        uses: nix-community/cache-nix-action@v7
         with:
-          default: true
-          buildtargets: esp32s3
-          ldproxy: false
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.nix', 'flake.lock') }}
+          save: false
+      - name: Enter the flake dev shell
+        uses: nicknovitski/nix-develop@v1
       - name: Enable caching
         uses: Swatinem/rust-cache@v2
         with:
@@ -102,10 +110,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+      - name: Cache the Nix store
+        uses: nix-community/cache-nix-action@v7
         with:
-          components: clippy, rustfmt
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.nix', 'flake.lock') }}
+      - name: Enter the flake dev shell
+        uses: nicknovitski/nix-develop@v1
       - name: Enable caching
         uses: Swatinem/rust-cache@v2
       - name: Format
