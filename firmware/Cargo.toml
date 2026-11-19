@@ -3,7 +3,7 @@ name = "esp-miner-rs"
 version = "0.1.0"
 authors = ["Georges Palauqui <g.palauqui@gptechinno.com>"]
 edition = "2021"
-description = "Rust based firmware for BitaxeMax"
+description = "Rust based firmware for the Bitaxe boards"
 repository = "https://github.com/bitaxeorg/esp-miner-rs"
 license = "MIT OR Apache-2.0"
 
