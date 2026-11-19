@@ -10,7 +10,7 @@ use embassy_time::{Duration, Timer};
 use esp_hal::{i2c::master::I2c, Async};
 use miner_core::thermal;
 
-use crate::{board, cooling::Cooling, vcore::Vcore};
+use crate::{board, cooling::Cooling, status, vcore::Vcore};
 
 /// A device on the shared I²C bus.
 pub type BusDevice = I2cDevice<'static, NoopRawMutex, I2c<'static, Async>>;
@@ -40,7 +40,11 @@ pub async fn power_task(mut vcore: Vcore, mut cooling: Cooling) {
         Timer::after(MONITOR_PERIOD).await;
 
         let temp = cooling.asic_temp().await;
-        vcore.log(temp).await;
+        let power_w = vcore.log(temp).await;
+        status::update(|s| {
+            s.asic_temp_c = temp;
+            s.power_w = power_w;
+        });
 
         if temp > thermal::OVERHEAT_C {
             vcore.off().await;

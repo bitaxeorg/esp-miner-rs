@@ -4,9 +4,12 @@
 mod asic;
 mod board;
 mod cooling;
+#[cfg(feature = "display-oled")]
+mod display;
 mod io06;
 mod pool;
 mod power;
+mod status;
 mod vcore;
 
 use defmt::{debug, error, info};
@@ -163,6 +166,10 @@ async fn main(spawner: Spawner) -> ! {
 
     spawner.spawn(connection_task(controller).unwrap());
     spawner.spawn(net_task(runner).unwrap());
+
+    // Status screen on the OLED, on the shared I2C bus
+    #[cfg(feature = "display-oled")]
+    spawner.spawn(display::display_task(I2cDevice::new(i2c_bus), stack).unwrap());
 
     // Pool session
     spawner.spawn(

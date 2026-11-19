@@ -28,7 +28,9 @@ This is a proof of concept:
 - The BitaxeMax can't mine yet: the BM1397 needs midstates, which [bm13xx-rs] doesn't compute yet.
 - The WiFi credentials are compiled in, and the pool address, worker and password are constants
   at the top of `firmware/src/pool.rs`.
-- No display, web interface or settings storage yet.
+- The boards with the original pins show a status screen on their SSD1306 OLED (128 × 32): hashrate,
+  ASIC temperature and power, pool shares and best difficulty, IP address. The colour display of
+  the NajaDuo and GammaHex isn't supported yet, nor a web interface or settings storage.
 
 ## Architecture
 
@@ -41,10 +43,11 @@ This is a proof of concept:
     on overheat
   - `asic.rs`: brings the chain up with [bm13xx-rs], feeds it jobs and checks the nonces
   - `pool.rs`: the Stratum v1 session
-- `miner-core/`: the hardware independent mining logic (block header, share check, job book, core
-  voltage, fan curve), tested on the host
+  - `status.rs`: the status the tasks fill in, and `display.rs`: the OLED status screen
+- `miner-core/`: the hardware independent mining logic (block header, share check, job book,
+  hashrate meter, core voltage, fan curve, units), tested on the host
 - drivers: [bm13xx-rs] for the ASICs, [tps546], [emc2101], [emc2103], [emc230x], [tmp1075],
-  [ds4432] and [ina260]
+  [ds4432], [ina260] and [ssd1306]
 
 ## Setup
 
@@ -102,6 +105,7 @@ can't join your network: build your own to mine.
 [tmp1075]:https://github.com/JanekGraff/tmp1075-rs
 [ds4432]:https://github.com/w3irdrobot/ds4432
 [ina260]:https://github.com/therealprof/ina260
+[ssd1306]:https://github.com/rust-embedded-community/ssd1306
 [BitaxeMax]:https://github.com/bitaxeorg/bitaxeMax
 [BitaxeUltra]:https://github.com/bitaxeorg/bitaxeUltra
 [BitaxeHex]:https://github.com/bitaxeorg/ultraHex

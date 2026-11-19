@@ -18,7 +18,7 @@ use heapless::String;
 use miner_core::job::MiningJob;
 use stratum_v1::{Client, Extensions, Message, Share, VersionRolling};
 
-use crate::{board, io06::Io06};
+use crate::{board, io06::Io06, status};
 
 /// Jobs rolled from the pool work, ready for the chips.
 pub static JOBS: Channel<CriticalSectionRawMutex, MiningJob, 2> = Channel::new();
@@ -83,6 +83,7 @@ pub async fn pool_task(
         stack.wait_config_up().await;
         let Err(e) = session(stack, &mut rx_buf[..], &mut tx_buf[..]).await;
         error!("pool session ended: {}", e);
+        status::update(|s| s.pool_connected = false);
         // jobs and shares of the old session are stale
         JOBS.clear();
         SHARES.clear();
@@ -184,9 +185,20 @@ async fn handle_message(
                 )
                 .await?
         }
-        Message::Authorized => *authorized = true,
+        Message::Authorized => {
+            *authorized = true;
+            status::update(|s| {
+                s.pool_connected = true;
+                s.accepted = 0;
+                s.rejected = 0;
+            });
+        }
         Message::Share { accepted, rejected } => {
-            info!("shares accepted: {}, rejected: {}", accepted, rejected)
+            info!("shares accepted: {}, rejected: {}", accepted, rejected);
+            status::update(|s| {
+                s.accepted = accepted;
+                s.rejected = rejected;
+            });
         }
         Message::VersionMask(mask) => VERSION_MASK.lock(|m| m.set(mask)),
         Message::Difficulty(diff) => POOL_DIFFICULTY.lock(|d| d.set(diff)),

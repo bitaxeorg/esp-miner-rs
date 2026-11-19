@@ -64,21 +64,27 @@ mod dac {
             self.enable.set_high();
         }
 
-        /// Logs the input power with the ASIC temperature.
-        pub async fn log(&mut self, asic_temp: f32) {
+        /// Logs the input power with the ASIC temperature, and returns the input power (W).
+        pub async fn log(&mut self, asic_temp: f32) -> Option<f32> {
             match (
                 self.monitor.power().await,
                 self.monitor.current().await,
                 self.monitor.voltage().await,
             ) {
-                (Ok(mw), Ok(ua), Ok(uv)) => info!(
-                    "ASIC {} °C, input {} mW ({} mV, {} mA)",
-                    asic_temp,
-                    mw,
-                    uv / 1000,
-                    ua / 1000
-                ),
-                _ => warn!("ASIC {} °C, reading the INA260 failed", asic_temp),
+                (Ok(mw), Ok(ua), Ok(uv)) => {
+                    info!(
+                        "ASIC {} °C, input {} mW ({} mV, {} mA)",
+                        asic_temp,
+                        mw,
+                        uv / 1000,
+                        ua / 1000
+                    );
+                    Some(mw as f32 / 1000.0)
+                }
+                _ => {
+                    warn!("ASIC {} °C, reading the INA260 failed", asic_temp);
+                    None
+                }
             }
         }
     }
@@ -218,25 +224,31 @@ mod pmbus {
             }
         }
 
-        /// Logs the regulator readings with the ASIC temperature. The output power leaves out the
-        /// rest of the board.
-        pub async fn log(&mut self, asic_temp: f32) {
+        /// Logs the regulator readings with the ASIC temperature, and returns the regulator output
+        /// power (W), which leaves out the rest of the board.
+        pub async fn log(&mut self, asic_temp: f32) -> Option<f32> {
             match (
                 self.tps.read_vin().await,
                 self.tps.read_vout().await,
                 self.tps.read_iout().await,
                 self.tps.read_temperature().await,
             ) {
-                (Ok(vin), Ok(vout), Ok(iout), Ok(temp)) => info!(
-                    "ASIC {} °C, core {} mW ({} mV, {} mA), input {} mV, regulator {} °C",
-                    asic_temp,
-                    (vout * iout * 1000.0) as u32,
-                    (vout * 1000.0) as u32,
-                    (iout * 1000.0) as u32,
-                    (vin * 1000.0) as u32,
-                    temp
-                ),
-                _ => warn!("ASIC {} °C, reading the TPS546 failed", asic_temp),
+                (Ok(vin), Ok(vout), Ok(iout), Ok(temp)) => {
+                    info!(
+                        "ASIC {} °C, core {} mW ({} mV, {} mA), input {} mV, regulator {} °C",
+                        asic_temp,
+                        (vout * iout * 1000.0) as u32,
+                        (vout * 1000.0) as u32,
+                        (iout * 1000.0) as u32,
+                        (vin * 1000.0) as u32,
+                        temp
+                    );
+                    Some(vout * iout)
+                }
+                _ => {
+                    warn!("ASIC {} °C, reading the TPS546 failed", asic_temp);
+                    None
+                }
             }
         }
 

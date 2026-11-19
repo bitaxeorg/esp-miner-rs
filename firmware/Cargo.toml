@@ -38,6 +38,7 @@ embassy-net = { version = "0.9.1", features = [
 ] }
 embassy-sync = "0.8.0"
 embassy-time = { version = "0.5.1", features = ["defmt"] }
+embedded-graphics = { version = "0.8.2", optional = true }
 embedded-hal = "1.0.0"
 embedded-hal-async = { version = "1.0.0", features = ["defmt-03"] }
 embedded-io = "0.7.1"
@@ -86,6 +87,7 @@ ina260 = { version = "0.4.0", features = [
 ], git = "https://github.com/Georges760/ina260.git", rev = "30dd697cf20ab7fc1f6e55d22823adf18afc86b0", optional = true }
 miner-core = { path = "../miner-core", features = ["defmt"] }
 pmbus-adapter = { version = "0.1.0", optional = true }
+ssd1306 = { version = "0.10.0", optional = true, features = ["async"] }
 smbus-adapter = { version = "0.1.1", optional = true }
 smoltcp = { version = "0.13.0", default-features = false, features = [
     "medium-ethernet",
@@ -107,25 +109,25 @@ tps546 = { version = "0.1.0", optional = true }
 [features]
 # A board by its number, as printed on it: exactly one (see src/board.rs). Each enables the
 # board's parts listed at the end.
-bitaxe-102 = ["asic-bm1397", "fan-emc2101", "vcore-dac"]
-bitaxe-201 = ["asic-bm1366", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
-bitaxe-202 = ["asic-bm1366", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
-bitaxe-205 = ["asic-bm1366", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
-bitaxe-302 = ["asic-bm1366", "fan-emc2302", "vcore-tps546"]
-bitaxe-303 = ["asic-bm1366", "fan-emc2302", "vcore-tps546"]
-bitaxe-207 = ["asic-bm1366", "fan-emc2101", "vcore-tps546"]
-bitaxe-400 = ["asic-bm1368", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
-bitaxe-401 = ["asic-bm1368", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
-bitaxe-402 = ["asic-bm1368", "fan-emc2101", "vcore-tps546"]
-bitaxe-403 = ["asic-bm1368", "fan-emc2101", "vcore-tps546"]
-bitaxe-600 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
-bitaxe-601 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
-bitaxe-602 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
-bitaxe-603 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
-bitaxe-650 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
-bitaxe-701 = ["asic-bm1368", "fan-emc2302", "vcore-tps546"]
-bitaxe-702 = ["asic-bm1368", "fan-emc2302", "vcore-tps546"]
-bitaxe-801 = ["asic-bm1370", "fan-emc2103", "vcore-tps546"]
+bitaxe-102 = ["asic-bm1397", "display-oled", "fan-emc2101", "vcore-dac"]
+bitaxe-201 = ["asic-bm1366", "asic-temp-internal", "display-oled", "fan-emc2101", "vcore-dac"]
+bitaxe-202 = ["asic-bm1366", "asic-temp-internal", "display-oled", "fan-emc2101", "vcore-dac"]
+bitaxe-205 = ["asic-bm1366", "asic-temp-internal", "display-oled", "fan-emc2101", "vcore-dac"]
+bitaxe-302 = ["asic-bm1366", "display-oled", "fan-emc2302", "vcore-tps546"]
+bitaxe-303 = ["asic-bm1366", "display-oled", "fan-emc2302", "vcore-tps546"]
+bitaxe-207 = ["asic-bm1366", "display-oled", "fan-emc2101", "vcore-tps546"]
+bitaxe-400 = ["asic-bm1368", "asic-temp-internal", "display-oled", "fan-emc2101", "vcore-dac"]
+bitaxe-401 = ["asic-bm1368", "asic-temp-internal", "display-oled", "fan-emc2101", "vcore-dac"]
+bitaxe-402 = ["asic-bm1368", "display-oled", "fan-emc2101", "vcore-tps546"]
+bitaxe-403 = ["asic-bm1368", "display-oled", "fan-emc2101", "vcore-tps546"]
+bitaxe-600 = ["asic-bm1370", "display-oled", "fan-emc2101", "vcore-tps546"]
+bitaxe-601 = ["asic-bm1370", "display-oled", "fan-emc2101", "vcore-tps546"]
+bitaxe-602 = ["asic-bm1370", "display-oled", "fan-emc2101", "vcore-tps546"]
+bitaxe-603 = ["asic-bm1370", "display-oled", "fan-emc2101", "vcore-tps546"]
+bitaxe-650 = ["asic-bm1370", "display-oled", "fan-emc2101", "vcore-tps546"]
+bitaxe-701 = ["asic-bm1368", "display-oled", "fan-emc2302", "vcore-tps546"]
+bitaxe-702 = ["asic-bm1368", "display-oled", "fan-emc2302", "vcore-tps546"]
+bitaxe-801 = ["asic-bm1370", "display-oled", "fan-emc2103", "vcore-tps546"]
 bitaxe-1201 = [
     "asic-bm1372",
     "asic-enable",
@@ -162,6 +164,8 @@ asic-bm1397 = ["dep:bm1397"]
 asic-enable = []
 # ASIC temperature from the EMC2101 internal sensor plus an offset, instead of the chip's diode.
 asic-temp-internal = []
+# SSD1306 OLED (128 × 32) on the I2C bus.
+display-oled = ["dep:embedded-graphics", "dep:ssd1306"]
 fan-emc2101 = ["dep:emc2101"]
 fan-emc2103 = ["dep:emc2103"]
 # Two fans on an EMC2302, the temperature from two TMP1075 board sensors.

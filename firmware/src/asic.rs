@@ -13,13 +13,16 @@ use esp_hal::{
 };
 use fugit::HertzU64;
 use heapless::String;
-use miner_core::{job::JobBook, share::check_nonce, timing::job_interval_ms};
+use miner_core::{
+    hashrate::HashrateMeter, job::JobBook, share::check_nonce, timing::job_interval_ms,
+};
 use stratum_v1::Share;
 
 use crate::{
     board,
     pool::{CLEAN_JOBS, JOBS, POOL_DIFFICULTY, SHARES, VERSION_MASK, VERSION_MASK_REQUEST},
     power::POWER_READY,
+    status,
 };
 
 /// How often to poll the chain for responses.
@@ -30,6 +33,11 @@ const RESET_DURATION: Duration = Duration::from_millis(100);
 const DEFAULT_BAUDRATE: u32 = 115_200;
 /// Enough for the 16 or 32 job ids the chain cycles through.
 const JOB_IDS: usize = 32;
+/// The hashrate is measured over 60 buckets of 10 s.
+const HASHRATE_BUCKETS: usize = 60;
+const HASHRATE_BUCKET_MS: u64 = 10_000;
+/// How often to publish the hashrate.
+const STATUS_PERIOD: Duration = Duration::from_secs(1);
 
 type UartError = <Uart<'static, Async> as embedded_io::ErrorType>::Error;
 type ChainError = bm13xx_chain::Error<UartError, Infallible, Infallible>;
@@ -152,9 +160,20 @@ async fn run_chain(
 
     let mut book = JobBook::<JOB_IDS>::new();
     let mut next_job = Instant::now();
+    let mut meter =
+        HashrateMeter::<HASHRATE_BUCKETS>::new(Instant::now().as_millis(), HASHRATE_BUCKET_MS);
+    let mut next_status = Instant::now();
     loop {
         while let Some(resp) = chain.poll_response().await? {
-            handle_response(&book, resp);
+            if let Some(difficulty) = handle_response(&book, resp) {
+                meter.record(Instant::now().as_millis());
+                status::update(|s| s.best_difficulty = s.best_difficulty.max(difficulty));
+            }
+        }
+        if Instant::now() >= next_status {
+            let ghs = meter.ghs(Instant::now().as_millis(), board::ASIC_DIFFICULTY) as f32;
+            status::update(|s| s.hashrate_ghs = ghs);
+            next_status = Instant::now() + STATUS_PERIOD;
         }
         if CLEAN_JOBS.signaled() {
             CLEAN_JOBS.reset();
@@ -180,19 +199,20 @@ async fn run_chain(
     }
 }
 
-/// Checks a nonce returned by a chip and queues it as a share if the pool wants it.
-fn handle_response(book: &JobBook<JOB_IDS>, resp: ResponseType) {
+/// Checks a nonce returned by a chip and queues it as a share if the pool wants it. Returns the
+/// nonce difficulty when it is valid.
+fn handle_response(book: &JobBook<JOB_IDS>, resp: ResponseType) -> Option<f64> {
     let (job_id, nonce, version_bits) = match resp {
         ResponseType::JobVer(r) => (r.job_id, r.nonce, Some(r.version_bit)),
         ResponseType::Job(r) => (r.job_id, r.nonce, None),
         ResponseType::Reg(r) => {
             debug!("register response: {}", r);
-            return;
+            return None;
         }
     };
     let Some(job) = book.get(job_id as u8) else {
         warn!("nonce {:#010x} for unknown job id {}", nonce, job_id);
-        return;
+        return None;
     };
     let checked = check_nonce(job, nonce, version_bits, VERSION_MASK.lock(Cell::get));
     let pool_difficulty = POOL_DIFFICULTY.lock(Cell::get);
@@ -202,7 +222,7 @@ fn handle_response(book: &JobBook<JOB_IDS>, resp: ResponseType) {
             "invalid nonce {:#010x} (difficulty {}): wrong job data or hardware error",
             nonce, checked.difficulty
         );
-        return;
+        return None;
     }
     info!(
         "nonce {:#010x}: difficulty {} (pool {})",
@@ -220,4 +240,5 @@ fn handle_response(book: &JobBook<JOB_IDS>, resp: ResponseType) {
             warn!("share queue full, dropping a share");
         }
     }
+    Some(checked.difficulty)
 }
