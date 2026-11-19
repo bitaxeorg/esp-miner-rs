@@ -47,6 +47,24 @@ impl Panel for Oled {
         };
         let font = &PORTFOLIO_6X8;
         let line_height = i32::from(font.line_height);
+        if view.identify {
+            // "Hi!" three times the font size, centred
+            const SCALE: i32 = 3;
+            let text = "Hi!";
+            let x0 = (WIDTH - font.text_width(text) * SCALE) / 2;
+            let y0 = (HEIGHT - line_height * SCALE) / 2;
+            font.draw(text, 0, 0, &mut |x, y| {
+                for dy in 0..SCALE {
+                    for dx in 0..SCALE {
+                        plot(x0 + x * SCALE + dx, y0 + y * SCALE + dy);
+                    }
+                }
+            });
+            if let Err(e) = display.flush().await {
+                warn!("OLED display update failed: {}", Debug2Format(&e));
+            }
+            return;
+        }
         match view.screen {
             Screen::BitaxeLogo => {
                 let logo = &images::BITAXE_LOGO;
@@ -94,6 +112,12 @@ impl Panel for Oled {
             warn!("OLED display update failed: {}", Debug2Format(&e));
         }
     }
+
+    async fn set_on(&mut self, on: bool) {
+        if let Err(e) = self.0.set_display_on(on).await {
+            warn!("OLED display power failed: {}", Debug2Format(&e));
+        }
+    }
 }
 
 /// Finds the OLED, then shows the status screens on it. Ends at once when no OLED answers.
@@ -107,11 +131,21 @@ pub async fn display_task(mut bus: BusDevice, stack: Stack<'static>, button: Inp
         info!("no OLED display found");
         return;
     };
-    let mut display = Ssd1306Async::new(interface, DisplaySize128x32, DisplayRotation::Rotate0)
-        .into_buffered_graphics_mode();
+    // 180° turns the display over; 90° and 270° don't fit its shape
+    let (rotation, invert) = crate::settings::with(|s| (s.rotation, s.invert_screen));
+    let rotation = if rotation == 180 || rotation == 270 {
+        DisplayRotation::Rotate180
+    } else {
+        DisplayRotation::Rotate0
+    };
+    let mut display =
+        Ssd1306Async::new(interface, DisplaySize128x32, rotation).into_buffered_graphics_mode();
     if let Err(e) = display.init().await {
         warn!("OLED display setup failed: {}", Debug2Format(&e));
         return;
+    }
+    if invert {
+        let _ = display.set_invert(true).await;
     }
     info!("OLED display found");
     run(&mut Oled(display), stack, button).await;

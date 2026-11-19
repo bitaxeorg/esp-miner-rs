@@ -1,17 +1,28 @@
 #![no_std]
 #![no_main]
+#![feature(impl_trait_in_assoc_type)]
+#![recursion_limit = "512"]
+
+extern crate alloc;
 
 mod asic;
 mod board;
 mod cooling;
 #[cfg(any(feature = "display-oled", feature = "display-st7789"))]
 mod display;
+mod flash;
+mod net;
+mod ota;
 mod pool;
 mod power;
+mod settings;
+mod stats;
 mod status;
 mod vcore;
+mod web;
+mod weblog;
 
-use defmt::{debug, error, info};
+use defmt::info;
 use defmt_rtt as _;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
@@ -29,10 +40,8 @@ use esp_hal::{
     timer::timg::TimerGroup,
     uart::{self, Uart},
 };
-use esp_radio::wifi::{
-    sta::StationConfig, AuthenticationMethodConfig, Config, ControllerConfig, Interface,
-    WifiController,
-};
+use esp_radio::wifi::{Config, ControllerConfig, Interface, WifiController};
+use picoserve::AppBuilder;
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -47,18 +56,21 @@ macro_rules! mk_static {
     }};
 }
 
-const WIFI_SSID: &str = env!("WIFI_SSID");
-const WIFI_PASSWORD: &str = env!("WIFI_PASSWORD");
-
 #[esp_rtos::main]
 async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(size: 72 * 1024);
+    esp_alloc::heap_allocator!(size: 104 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+
+    flash::init(peripherals.FLASH).await;
+    settings::load().await;
+    ota::confirm().await;
+    spawner.spawn(web::restart_task().unwrap());
+    spawner.spawn(stats::stats_task().unwrap());
 
     // Power on I2C0 (SDA GPIO47, SCL GPIO48, or GPIO44 and GPIO43 on the boards with the colour
     // display): the core regulator (see `vcore`) and the fan controller, which also reads the
@@ -149,35 +161,61 @@ async fn main(spawner: Spawner) -> ! {
     let reset = Output::new(peripherals.GPIO1, Level::Low, OutputConfig::default());
     spawner.spawn(asic::asic_task(asic::AsicUart::new(uart, uart_config), reset).unwrap());
 
-    // WiFi and network stack
-    let station_config = Config::Station(
-        StationConfig::default()
-            .with_ssid(WIFI_SSID.try_into().unwrap())
-            .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
-                WIFI_PASSWORD.try_into().unwrap(),
-            )),
-    );
-    let wifi_interface = Interface::station();
+    // WiFi: the station of the settings, and the open setup access point until the station has
+    // an address
+    let (configured, hostname) = settings::with(|s| (!s.ssid.is_empty(), s.hostname.clone()));
+    let station_interface = Interface::station();
+    let ap_interface = Interface::access_point();
     let controller = WifiController::new(
         peripherals.WIFI,
-        ControllerConfig::default().with_initial_config(station_config),
+        ControllerConfig::default().with_initial_config(Config::AccessPointStation(
+            net::station_config(),
+            net::ap_config(),
+        )),
     )
     .unwrap();
 
-    let config = embassy_net::Config::dhcpv4(Default::default());
+    let mut dhcp = embassy_net::DhcpConfig::default();
+    dhcp.hostname = heapless::String::try_from(hostname.as_str()).ok();
+    let config = embassy_net::Config::dhcpv4(dhcp);
 
     let rng = Rng::new();
     let seed = (rng.random() as u64) << 32 | rng.random() as u64;
 
     let (stack, runner) = embassy_net::new(
-        wifi_interface,
+        station_interface,
         config,
-        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        mk_static!(StackResources<8>, StackResources::<8>::new()),
         seed,
     );
+    let ap_config = embassy_net::Config::ipv4_static(embassy_net::StaticConfigV4 {
+        address: embassy_net::Ipv4Cidr::new(net::AP_ADDRESS, net::AP_PREFIX),
+        gateway: Some(net::AP_ADDRESS),
+        dns_servers: Default::default(),
+    });
+    let (ap_stack, ap_runner) = embassy_net::new(
+        ap_interface,
+        ap_config,
+        mk_static!(StackResources<6>, StackResources::<6>::new()),
+        seed.rotate_left(32),
+    );
 
-    spawner.spawn(connection_task(controller).unwrap());
+    spawner.spawn(net::connection_task(controller, configured).unwrap());
     spawner.spawn(net_task(runner).unwrap());
+    spawner.spawn(net_task(ap_runner).unwrap());
+    spawner.spawn(net::address_task(stack).unwrap());
+    spawner.spawn(net::dhcp_task(ap_stack).unwrap());
+    spawner.spawn(net::captive_dns_task(ap_stack).unwrap());
+    spawner.spawn(net::mdns_task(stack, rng).unwrap());
+
+    // web interface, on the station and on the access point
+    let app = mk_static!(picoserve::AppRouter<web::App>, web::App.build_app());
+    for id in 0..web::STATION_TASKS {
+        spawner.spawn(web::station_task(id, stack, app).unwrap());
+    }
+    for id in 0..web::AP_TASKS {
+        spawner.spawn(web::ap_task(id, ap_stack, app).unwrap());
+    }
 
     // The BOOT button (GPIO0, active low) moves the status screens on.
     #[cfg(any(feature = "display-oled", feature = "display-st7789"))]
@@ -248,28 +286,7 @@ async fn main(spawner: Spawner) -> ! {
     }
 }
 
-#[embassy_executor::task]
-async fn connection_task(mut controller: WifiController<'static>) {
-    debug!("start connection task");
-    loop {
-        debug!("About to connect...");
-
-        match controller.connect_async().await {
-            Ok(_) => {
-                debug!("Wifi connected!");
-                // wait until we're no longer connected
-                controller.wait_for_disconnect_async().await.ok();
-                debug!("Wifi disconnected");
-            }
-            Err(e) => {
-                error!("Failed to connect to wifi: {:?}", e);
-            }
-        }
-        Timer::after(Duration::from_millis(5000)).await
-    }
-}
-
-#[embassy_executor::task]
+#[embassy_executor::task(pool_size = 2)]
 async fn net_task(mut runner: Runner<'static, Interface>) {
     runner.run().await
 }

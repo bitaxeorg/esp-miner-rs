@@ -19,6 +19,8 @@ pub struct Reading {
     /// Core voltage of a chip.
     pub vcore_v: Option<f32>,
     pub current_a: Option<f32>,
+    /// Regulator temperature (°C), on the boards that measure it.
+    pub vr_temp_c: Option<f32>,
 }
 
 #[cfg(feature = "vcore-dac")]
@@ -113,6 +115,7 @@ mod dac {
                         vin_v: Some(uv as f32 / 1_000_000.0),
                         vcore_v,
                         current_a: Some(ua as f32 / 1_000_000.0),
+                        vr_temp_c: None,
                     }
                 }
                 _ => {
@@ -290,6 +293,7 @@ mod pmbus {
                         vin_v: Some(vin),
                         vcore_v: Some(vout / board::VOLTAGE_DOMAINS as f32),
                         current_a: Some(iout),
+                        vr_temp_c: Some(temp),
                     }
                 }
                 _ => {

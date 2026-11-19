@@ -40,7 +40,7 @@ impl Screen {
 
 /// The screen shown, from the miner state, the time and the button.
 ///
-/// The overheat screen stays once shown. Without network, the connection screen. With it, the
+/// The overheat screen while the chips are off after an overheat. Without network, the connection screen. With it, the
 /// connection screen a second more, then the Bitaxe and OSMU logos, then the URLs, statistics,
 /// mining and Wi-Fi screens in a loop, each for its delay or until the button. A large display
 /// shows the statistics screen alone once connected.
@@ -62,9 +62,9 @@ impl Carousel {
 
     /// The screen to show `dt_ms` after the last update.
     pub fn update(&mut self, dt_ms: u32, connected: bool, overheat: bool) -> Screen {
-        if overheat || self.screen == Screen::Overheat {
+        if overheat {
             self.show(Screen::Overheat);
-        } else if !connected {
+        } else if !connected || self.screen == Screen::Overheat {
             self.show(Screen::Connection);
         } else if self.large {
             self.show(Screen::Stats);
@@ -163,11 +163,14 @@ mod tests {
     }
 
     #[test]
-    fn overheat_stays() {
+    fn overheat_shows_while_set() {
         let mut carousel = Carousel::new(false);
         carousel.update(500, true, false);
         assert_eq!(carousel.update(500, true, true), Screen::Overheat);
-        assert_eq!(carousel.update(500, true, false), Screen::Overheat);
         assert_eq!(carousel.button(), Screen::Overheat);
+        assert_eq!(carousel.update(500, true, true), Screen::Overheat);
+        // cooled down: back through the connection screen
+        assert_eq!(carousel.update(500, true, false), Screen::Connection);
+        assert_eq!(carousel.update(1500, true, false), Screen::BitaxeLogo);
     }
 }

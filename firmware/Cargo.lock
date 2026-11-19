@@ -3,6 +3,12 @@
 version = 4
 
 [[package]]
+name = "adler2"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
+
+[[package]]
 name = "aead"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -367,6 +373,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b396d1f76d455557e1218ec8066ae14bba60b4b36ecd55577ba979f5db7ecaa"
 
 [[package]]
+name = "const-sha1"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d8a42181e0652c2997ae4d217f25b63c5337a52fd2279736e97b832fa0a3cff"
+
+[[package]]
 name = "cordyceps"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -698,6 +710,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "domain"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b68712c02bff2348323c1441ab2e8528e32af4f8f9edf29356356290328c8e6"
+dependencies = [
+ "domain-macros",
+ "heapless 0.9.3",
+ "jiff",
+ "octseq",
+]
+
+[[package]]
+name = "domain-macros"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fba8fbc4580c745dfeab102232dcb729f030ac3e2c9ff5374a9dfd6dc9ddf8e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "ds4432"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -707,6 +742,77 @@ dependencies = [
  "embedded-hal-async",
  "maybe-async-cfg2",
 ]
+
+[[package]]
+name = "edge-captive"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40b33a9eb1a9d1a7357afdd83b85e8134bed8ef5e2d00ccb05cb6b1e8168e698"
+dependencies = [
+ "domain",
+ "edge-nal",
+]
+
+[[package]]
+name = "edge-dhcp"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7a6f957c944e22c2c1904618863702e8af302953454ac738e6df0c7038c4d88"
+dependencies = [
+ "defmt 1.2.0",
+ "edge-nal",
+ "edge-raw",
+ "embassy-futures",
+ "embassy-time",
+ "heapless 0.9.3",
+ "num_enum",
+ "rand_core 0.10.1",
+]
+
+[[package]]
+name = "edge-mdns"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4c32f19b7b4fb455e0bc270bcfe8ca595813ea935a2606447a32fe99b0b1843"
+dependencies = [
+ "defmt 1.2.0",
+ "domain",
+ "edge-nal",
+ "embassy-futures",
+ "embassy-sync 0.8.0",
+ "embassy-time",
+ "heapless 0.9.3",
+ "rand_core 0.10.1",
+]
+
+[[package]]
+name = "edge-nal"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "590182a48668fa4988cd97b9b500bcc9a213e9b122b4e0008e934b3916c64031"
+dependencies = [
+ "embassy-time",
+ "embedded-io-async 0.7.0",
+]
+
+[[package]]
+name = "edge-nal-embassy"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79ad23a63d41bdda528a3b725ae9119ce58abeea265b41fc7f8b254c8d07b2a2"
+dependencies = [
+ "defmt 1.2.0",
+ "edge-nal",
+ "embassy-futures",
+ "embassy-net",
+ "embedded-io-async 0.7.0",
+]
+
+[[package]]
+name = "edge-raw"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c87c23c2a56d22076013bbf039425369d05bdb9ac833e3249c48008a46e1f95c"
 
 [[package]]
 name = "embassy-embedded-hal"
@@ -1151,6 +1257,7 @@ checksum = "ba0e487f6843419bb085d871f6e860da1bb8c267ce1c5db1051b83882e943054"
 dependencies = [
  "defmt 1.2.0",
  "document-features",
+ "embedded-storage",
  "esp-config",
  "esp-hal-procmacros",
  "esp-metadata-generated",
@@ -1261,6 +1368,7 @@ checksum = "911aadae41ec99104efa865bd0b6e486b4b735999f9b571963748a46d16495ab"
 name = "esp-miner-rs"
 version = "0.1.0"
 dependencies = [
+ "bitcoin_hashes",
  "bm1366",
  "bm1368",
  "bm1370",
@@ -1272,6 +1380,11 @@ dependencies = [
  "defmt 1.2.0",
  "defmt-rtt",
  "ds4432",
+ "edge-captive",
+ "edge-dhcp",
+ "edge-mdns",
+ "edge-nal",
+ "edge-nal-embassy",
  "embassy-embedded-hal",
  "embassy-executor",
  "embassy-futures",
@@ -1282,6 +1395,7 @@ dependencies = [
  "embedded-hal-async",
  "embedded-io 0.7.1",
  "embedded-io-async 0.7.0",
+ "embedded-storage",
  "emc2101",
  "emc2103",
  "emc230x",
@@ -1289,14 +1403,20 @@ dependencies = [
  "esp-backtrace",
  "esp-bootloader-esp-idf",
  "esp-hal",
+ "esp-nvs",
  "esp-radio",
  "esp-rtos",
+ "esp-storage",
  "esp-wifi-sys-esp32s3",
  "fugit 0.6.0",
  "heapless 0.9.3",
  "ina260",
  "miner-core",
+ "miniz_oxide",
+ "picoserve",
  "pmbus-adapter",
+ "serde",
+ "serde-json-core 0.7.0",
  "smbus-adapter",
  "smoltcp",
  "ssd1306",
@@ -1304,6 +1424,18 @@ dependencies = [
  "stratum-v1",
  "tmp1075",
  "tps546",
+]
+
+[[package]]
+name = "esp-nvs"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "952c42de0a9b05e4c833c55ea6776075a7ca688dfc19042b16db196ef5ee5bf4"
+dependencies = [
+ "defmt 1.2.0",
+ "embedded-storage",
+ "strum",
+ "thiserror",
 ]
 
 [[package]]
@@ -1448,7 +1580,9 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ef0e785f54e316f64a1e14a7a2f061a2ea0b038b284902ca71e1e1f5574cf47"
 dependencies = [
+ "defmt 1.2.0",
  "document-features",
+ "embedded-storage",
  "esp-hal",
  "esp-hal-procmacros",
  "esp-metadata-generated",
@@ -1827,6 +1961,7 @@ checksum = "0bfb9eb618601c89945a70e254898da93b13be0388091d42117462b265bb3fad"
 dependencies = [
  "defmt 0.3.101",
  "hash32 0.3.1",
+ "serde",
  "stable_deref_trait",
 ]
 
@@ -2090,6 +2225,17 @@ dependencies = [
  "bitcoin_hashes",
  "defmt 1.2.0",
  "heapless 0.9.3",
+ "serde",
+ "serde-json-core 0.7.0",
+]
+
+[[package]]
+name = "miniz_oxide"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
+dependencies = [
+ "adler2",
 ]
 
 [[package]]
@@ -2167,6 +2313,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "octseq"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "182eab3e1cd9cdc0ecf1ce3342d9844f3dc7d098f0694569bfdf327b612d69fd"
+dependencies = [
+ "heapless 0.9.3",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2177,6 +2332,58 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "picoserve"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "48ea8011a365c3c6151b430e81368ac304a2075a2016824e9113191d30987edb"
+dependencies = [
+ "const-sha1",
+ "defmt 1.2.0",
+ "embassy-net",
+ "embassy-time",
+ "embedded-io-async 0.7.0",
+ "futures-util",
+ "heapless 0.8.0",
+ "heapless 0.9.3",
+ "picoserve_derive",
+ "pin-project",
+ "serde",
+ "serde-json-core 0.6.0",
+ "thiserror",
+]
+
+[[package]]
+name = "picoserve_derive"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a6bb05b0d68b7b33e44cdd00189af3c704c14034c3f2b7d283114b1c3134687"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.10",
+]
+
+[[package]]
+name = "pin-project"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6c2123f4708bbd422630a6dae7c03f678b1ce1f1c99e4c4b3beac69c8174cc9"
+dependencies = [
+ "pin-project-internal",
+]
+
+[[package]]
+name = "pin-project-internal"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "358938fd6df944c1e44bb328b60fb275f13c804aac47ba26a1165d45a3f87756"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.10",
+]
 
 [[package]]
 name = "pin-project-lite"
@@ -2492,6 +2699,18 @@ dependencies = [
 
 [[package]]
 name = "serde-json-core"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b81787e655bd59cecadc91f7b6b8651330b2be6c33246039a65e5cd6f4e0828"
+dependencies = [
+ "defmt 0.3.101",
+ "heapless 0.8.0",
+ "ryu",
+ "serde",
+]
+
+[[package]]
+name = "serde-json-core"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d51e6795fbc00a1b26d78c7a0dbda143215d9dd0ee27c8a63ae0e1ccd6b83706"
@@ -2661,7 +2880,7 @@ dependencies = [
  "heapless 0.9.3",
  "rustversion",
  "serde",
- "serde-json-core",
+ "serde-json-core 0.7.0",
 ]
 
 [[package]]

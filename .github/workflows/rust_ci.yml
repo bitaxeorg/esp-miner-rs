@@ -9,11 +9,10 @@ on:
 
 # Every job runs in the dev shell of flake.nix (the esp toolchain, also for the host checks). The
 # Nix store is restored from the cache saved by the host checks.
+# No WiFi credentials: the builds start their setup access point.
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  WIFI_SSID: TestSSID
-  WIFI_PASSWORD: TestPASSWORD
 
 jobs:
   firmware-build:
@@ -46,11 +45,18 @@ jobs:
           key: bitaxe-${{ matrix.board }}
       - name: Build
         run: cargo build --release --features=bitaxe-${{ matrix.board }}
+      # the app image, for the update page of the web interface
+      - name: Image
+        run: >-
+          espflash save-image --chip esp32s3 --flash-size 16mb --partition-table partitions.csv
+          target/xtensa-esp32s3-none-elf/release/esp-miner-rs esp-miner-rs-bitaxe-${{ matrix.board }}.bin
       - name: Upload firmware
         uses: actions/upload-artifact@v7
         with:
           name: esp-miner-rs-bitaxe-${{ matrix.board }}
-          path: firmware/target/xtensa-esp32s3-none-elf/release/esp-miner-rs
+          path: |
+            firmware/target/xtensa-esp32s3-none-elf/release/esp-miner-rs
+            firmware/esp-miner-rs-bitaxe-${{ matrix.board }}.bin
           if-no-files-found: error
 
   firmware-checks:

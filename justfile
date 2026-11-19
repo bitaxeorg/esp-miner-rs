@@ -1,7 +1,8 @@
 set export
 
-WIFI_SSID := "my_ssid"
-WIFI_PASSWORD := "my_password"
+# Optional default WiFi credentials; empty, the miner starts its setup access point.
+WIFI_SSID := ""
+WIFI_PASSWORD := ""
 
 build b:
   cd firmware && cargo build --release --features=bitaxe-$b

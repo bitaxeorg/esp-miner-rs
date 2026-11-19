@@ -38,7 +38,7 @@ const WIDTH: usize = 320;
 const HEIGHT: usize = 170;
 const ROW_OFFSET: usize = 35;
 /// Rows drawn and sent at once.
-const ROW_HEIGHT: usize = 20;
+const ROW_HEIGHT: usize = 10;
 /// Bytes of a band of rows: the size of the DMA buffer.
 pub const ROW_BYTES: usize = WIDTH * ROW_HEIGHT * 2;
 /// Space around the column screens, and between their lines.
@@ -48,6 +48,7 @@ const WHITE: [u8; 2] = [0xFF, 0xFF];
 
 // ST7789 commands
 const SLPOUT: u8 = 0x11;
+const INVOFF: u8 = 0x20;
 const INVON: u8 = 0x21;
 const DISPON: u8 = 0x29;
 const CASET: u8 = 0x2A;
@@ -209,12 +210,12 @@ impl Lcd {
         Timer::after(SLEEP_OUT_WAIT).await;
         self.command(COLMOD, &[COLMOD_RGB565]).await?;
         self.command(RAMCTRL, &RAMCTRL_BIG_ENDIAN).await?;
-        self.command(INVON, &[]).await?;
-        let mirror = if board::ST7789_FLIP {
-            MADCTL_MX
-        } else {
-            MADCTL_MY
-        };
+        // the panel shows true colours inverted; 180° adds to the board's own mounting
+        let (rotation, invert) = crate::settings::with(|s| (s.rotation, s.invert_screen));
+        self.command(if invert { INVOFF } else { INVON }, &[])
+            .await?;
+        let flipped = board::ST7789_FLIP ^ (rotation == 180 || rotation == 270);
+        let mirror = if flipped { MADCTL_MX } else { MADCTL_MY };
         self.command(MADCTL, &[MADCTL_MV | mirror]).await?;
         for y in (0..HEIGHT).step_by(ROW_HEIGHT) {
             self.draw_band(y, |band| band.fill(0)).await?;
@@ -274,6 +275,22 @@ impl Lcd {
     /// The texts of `view`, and whether they sit on the background.
     fn items(view: &View<'_>) -> (Vec<Item, 16>, bool) {
         let mut items = Vec::new();
+        if view.identify {
+            let text = text(format_args!("Hi!"));
+            let width = UNSCII_16.text_width(&text);
+            let height = i32::from(UNSCII_16.line_height);
+            let _ = items.push(Item {
+                text,
+                x: (WIDTH as i32 - width) / 2,
+                y: (HEIGHT as i32 - height) / 2,
+                width,
+                height,
+                font: &UNSCII_16,
+                align: Align::Left,
+                scroll_ms: None,
+            });
+            return (items, false);
+        }
         if view.screen == Screen::Stats {
             let s = view.status;
             let temp = s.chip_temps_c[0].max(s.chip_temps_c[1]);
@@ -395,6 +412,14 @@ impl Panel for Lcd {
                 warn!("LCD update failed: {}", e);
                 return;
             }
+        }
+    }
+
+    async fn set_on(&mut self, on: bool) {
+        if on {
+            self.backlight.set_high();
+        } else {
+            self.backlight.set_low();
         }
     }
 }

@@ -11,7 +11,7 @@ use core::fmt::Write;
 use defmt::info;
 use embassy_futures::select::{select, Either};
 use embassy_net::Stack;
-use embassy_time::{Duration, Instant, Timer};
+use embassy_time::{with_timeout, Duration, Instant, Timer};
 use esp_hal::gpio::Input;
 use heapless::{String, Vec};
 use miner_core::{
@@ -20,7 +20,7 @@ use miner_core::{
 };
 
 use crate::{
-    pool::POOL_HOST,
+    settings,
     status::{self, Status},
 };
 
@@ -44,8 +44,13 @@ const REFRESH_PERIOD: Duration = Duration::from_millis(200);
 const NOTIFICATION_MS: u64 = 500;
 /// Presses of the button closer than this count once.
 const DEBOUNCE: Duration = Duration::from_millis(50);
+/// How long the button keeps a sleeping display on, and how long a press that toggles the setup
+/// access point lasts.
+const WAKE_TIME: Duration = Duration::from_secs(5);
+const LONG_PRESS: Duration = Duration::from_secs(2);
 /// Shown while the core power is cut.
-const OVERHEAT_MESSAGE: &str = "Core power has been cut until the next reboot.";
+const OVERHEAT_MESSAGE: &str =
+    "Power, frequency and fan settings have been changed. Go to the web interface to check them.";
 
 /// A display the screens are drawn on.
 trait Panel {
@@ -54,6 +59,9 @@ trait Panel {
 
     /// Draws `view`.
     async fn draw(&mut self, view: &View<'_>);
+
+    /// Turns the display on or off.
+    async fn set_on(&mut self, on: bool);
 }
 
 /// What a screen shows at a refresh.
@@ -66,6 +74,8 @@ struct View<'a> {
     rssi: Option<i8>,
     uptime_s: u64,
     notification: &'static str,
+    /// Saying hello, for the identify request.
+    identify: bool,
 }
 
 /// A line of a screen in a column: its text, and whether it scrolls when too wide.
@@ -84,8 +94,14 @@ impl View<'_> {
         let ip = self.ip.as_deref().unwrap_or("");
         match self.screen {
             Screen::Connection => {
-                line(true, format_args!("Wi-Fi: {}", crate::WIFI_SSID));
-                line(true, format_args!("Connecting..."));
+                let ssid =
+                    crate::settings::with(|s| Text::try_from(s.ssid.as_str()).unwrap_or_default());
+                line(true, format_args!("Wi-Fi: {ssid}"));
+                line(true, format_args!("{}", s.wifi_status));
+                if s.ap_enabled {
+                    line(false, format_args!("Setup Wi-Fi:"));
+                    line(true, format_args!("{}", s.ap_ssid));
+                }
             }
             Screen::Overheat => {
                 line(false, format_args!("DEVICE OVERHEAT!"));
@@ -95,7 +111,7 @@ impl View<'_> {
             }
             Screen::Urls => {
                 line(false, format_args!("Stratum Host:"));
-                line(true, format_args!("{POOL_HOST}"));
+                line(true, format_args!("{}", s.pool_url));
                 line(false, format_args!("IP Address:"));
                 line(false, format_args!("{ip}"));
             }
@@ -105,7 +121,19 @@ impl View<'_> {
                     Some(jth) => line(false, format_args!("J/Th: {jth:.2}")),
                     None => line(false, format_args!("J/Th: --")),
                 }
-                line(false, format_args!("Best: {}", best_text(s)));
+                if s.show_new_block {
+                    line(
+                        true,
+                        format_args!("Best: {}   !!! BLOCK FOUND !!!", best_text(s)),
+                    );
+                } else {
+                    let ever = if s.best_difficulty_ever > 0.0 {
+                        units::suffix_string(s.best_difficulty_ever as u64)
+                    } else {
+                        String::try_from("--").unwrap_or_default()
+                    };
+                    line(false, format_args!("Best: {}/{ever}", best_text(s)));
+                }
                 let [t1, t2] = s.chip_temps_c;
                 if t1 > 0.0 && t2 > 0.0 {
                     line(false, format_args!("Temp: {t1:.1}°C/{t2:.1}°C"));
@@ -185,13 +213,6 @@ fn ip_text(stack: Stack<'_>) -> Option<Text> {
 }
 
 /// RSSI of the access point the station is connected to (dBm).
-fn wifi_rssi() -> Option<i8> {
-    let mut rssi: esp_wifi_sys_esp32s3::c_types::c_int = 0;
-    // SAFETY: the Wi-Fi driver writes the RSSI to `rssi`, which outlives the call.
-    let err = unsafe { esp_wifi_sys_esp32s3::include::esp_wifi_sta_get_rssi(&mut rssi) };
-    (err == 0).then_some(rssi as i8)
-}
-
 /// The notification symbol for what changed since the last check.
 fn notification(accepted: bool, rejected: bool, received: bool) -> &'static str {
     match (received, rejected, accepted) {
@@ -212,8 +233,10 @@ async fn run<P: Panel>(panel: &mut P, stack: Stack<'static>, mut button: Input<'
     let mut screen = Screen::Connection;
     let mut screen_start = Instant::now();
     let mut last_update = Instant::now();
+    let mut last_press = Instant::now();
     let mut counters = (0, 0, 0);
     let mut shown = ("", Instant::now());
+    let mut on = true;
     loop {
         let now = Instant::now();
         let status = status::get();
@@ -236,33 +259,65 @@ async fn run<P: Panel>(panel: &mut P, stack: Stack<'static>, mut button: Input<'
             shown = (symbol, now);
             counters = latest;
         }
-        let notification = if (now - shown.1).as_millis() < NOTIFICATION_MS {
+        let notification = if status.mining_paused {
+            "||"
+        } else if (now - shown.1).as_millis() < NOTIFICATION_MS {
             shown.0
         } else {
             ""
         };
 
-        let view = View {
-            screen,
-            screen_ms: (now - screen_start).as_millis() as u32,
-            status: &status,
-            rssi: ip.as_ref().and_then(|_| wifi_rssi()),
-            ip,
-            uptime_s: now.as_secs(),
-            notification,
+        // the display sleeps after the timeout of the settings, but not before mining starts
+        let identify = status.identify_until_ms > now.as_millis();
+        let timeout = settings::with(|s| s.display_timeout);
+        let idle = now - last_press;
+        let before_carousel = matches!(screen, Screen::Connection | Screen::Overheat);
+        let want_on = match timeout {
+            t if t < 0 => true,
+            0 => before_carousel || idle < WAKE_TIME,
+            minutes => {
+                before_carousel || identify || idle < Duration::from_secs(minutes as u64 * 60)
+            }
         };
-        panel.draw(&view).await;
+        if want_on != on {
+            on = want_on;
+            panel.set_on(on).await;
+        }
+
+        if on {
+            let view = View {
+                screen,
+                screen_ms: (now - screen_start).as_millis() as u32,
+                status: &status,
+                rssi: ip.as_ref().and_then(|_| crate::net::wifi_rssi()),
+                ip,
+                uptime_s: now.as_secs(),
+                notification,
+                identify,
+            };
+            panel.draw(&view).await;
+        }
 
         if let Either::Second(_) =
             select(Timer::after(REFRESH_PERIOD), button.wait_for_falling_edge()).await
         {
             Timer::after(DEBOUNCE).await;
             if button.is_low() {
-                let next = carousel.button();
-                info!("button: next screen");
-                if next != screen {
-                    screen = next;
-                    screen_start = Instant::now();
+                last_press = Instant::now();
+                let held = with_timeout(LONG_PRESS - DEBOUNCE, button.wait_for_high()).await;
+                if held.is_err() {
+                    info!("button: long press");
+                    crate::net::TOGGLE_AP.signal(());
+                    button.wait_for_high().await;
+                } else if identify {
+                    status::update(|s| s.identify_until_ms = 0);
+                } else if on {
+                    let next = carousel.button();
+                    info!("button: next screen");
+                    if next != screen {
+                        screen = next;
+                        screen_start = Instant::now();
+                    }
                 }
             }
         }

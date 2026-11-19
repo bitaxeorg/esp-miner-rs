@@ -11,6 +11,7 @@ keywords = ["embedded", "embedded-hal", "esp", "esp32s3", "no-std"]
 categories = ["embedded", "no-std", "bitcoin"]
 
 [dependencies]
+bitcoin_hashes = { version = "1.2", default-features = false }
 bm1366 = { version = "0.4.0", features = ["defmt"], optional = true }
 bm1368 = { version = "0.4.0", features = ["defmt"], optional = true }
 bm1370 = { version = "0.4.0", features = ["defmt"], optional = true }
@@ -26,12 +27,26 @@ ds4432 = { version = "0.3.0", default-features = false, optional = true, feature
     "core-error",
     "defmt",
 ] }
+edge-captive = { version = "0.8.0", default-features = false, features = ["io"] }
+edge-dhcp = { version = "0.8.0", default-features = false, features = ["defmt", "io"] }
+edge-mdns = { version = "0.8.0", default-features = false, features = ["defmt", "io"] }
+edge-nal = "0.7.0"
+edge-nal-embassy = { version = "0.9.0", default-features = false, features = [
+    "defmt",
+    "medium-ethernet",
+    "multicast",
+    "proto-ipv4",
+    "udp",
+] }
 embassy-embedded-hal = { version = "0.6.0", features = ["defmt"] }
 embassy-executor = { version = "0.10.0", features = ["defmt"] }
 embassy-futures = "0.1.2"
 embassy-net = { version = "0.9.1", features = [
     "defmt",
     "dhcpv4",
+    "dhcpv4-hostname",
+    "dns",
+    "multicast",
     "medium-ethernet",
     "tcp",
     "udp",
@@ -41,6 +56,7 @@ embassy-time = { version = "0.5.1", features = ["defmt"] }
 embedded-hal = "1.0.0"
 embedded-hal-async = { version = "1.0.0", features = ["defmt-03"] }
 embedded-io = "0.7.1"
+embedded-storage = "0.3.1"
 embedded-io-async = "0.7.0"
 emc2101 = { version = "4.2.0", default-features = false, optional = true, features = [
     "async",
@@ -57,7 +73,7 @@ esp-backtrace = { version = "0.20.0", features = [
     "esp32s3",
     "panic-handler",
 ] }
-esp-bootloader-esp-idf = { version = "0.6.0", features = ["defmt", "esp32s3"] }
+esp-bootloader-esp-idf = { version = "0.6.0", features = ["defmt", "embedded-storage", "esp32s3"] }
 esp-hal = { version = "1.2.2", features = ["defmt", "esp32s3", "unstable"] }
 esp-radio = { version = "1.0.0-beta.1", features = [
     "defmt",
@@ -66,6 +82,7 @@ esp-radio = { version = "1.0.0-beta.1", features = [
     "unstable",
     "wifi",
 ] }
+esp-nvs = { version = "0.6.3", features = ["defmt"] }
 esp-rtos = { version = "0.4.0", features = [
     "defmt",
     "embassy",
@@ -73,15 +90,19 @@ esp-rtos = { version = "0.4.0", features = [
     "esp-radio",
     "esp32s3",
 ] }
-esp-wifi-sys-esp32s3 = { version = "0.3.0", optional = true }
+esp-storage = { version = "0.10.0", features = ["defmt", "embedded-storage", "esp32s3"] }
+esp-wifi-sys-esp32s3 = "0.3.0"
 fugit = "0.6.0"
-heapless = { version = "0.9.3", default-features = false, features = ["defmt"] }
+heapless = { version = "0.9.3", default-features = false, features = ["defmt", "serde"] }
 ina260 = { version = "0.4.0", features = [
     "defmt",
 ], git = "https://github.com/Georges760/ina260.git", rev = "30dd697cf20ab7fc1f6e55d22823adf18afc86b0", optional = true }
 miner-core = { path = "../miner-core", features = ["defmt"] }
+picoserve = { version = "0.21.0", features = ["defmt", "embassy"] }
 pmbus-adapter = { version = "0.1.0", optional = true }
 ssd1306 = { version = "0.10.0", optional = true, features = ["async"] }
+serde = { version = "1.0.228", default-features = false, features = ["derive"] }
+serde-json-core = { version = "0.7.0", default-features = false }
 smbus-adapter = { version = "0.1.1", optional = true }
 smoltcp = { version = "0.13.0", default-features = false, features = [
     "medium-ethernet",
@@ -99,6 +120,9 @@ tmp1075 = { version = "0.2.0", default-features = false, optional = true, featur
     "async",
 ] }
 tps546 = { version = "0.1.0", optional = true }
+
+[build-dependencies]
+miniz_oxide = "0.8.9"
 
 [features]
 # A board by its number, as printed on it: exactly one (see src/board.rs). Each enables the
@@ -161,9 +185,9 @@ asic-enable = []
 # ASIC temperature from the EMC2101 internal sensor plus an offset, instead of the chip's diode.
 asic-temp-internal = []
 # SSD1306 OLED (128 × 32) on the I2C bus.
-display-oled = ["dep:esp-wifi-sys-esp32s3", "dep:ssd1306"]
+display-oled = ["dep:ssd1306"]
 # ST7789 colour LCD (320 × 170) on the 8-bit i80 bus of LCD_CAM (boards with the colour display).
-display-st7789 = ["dep:esp-wifi-sys-esp32s3"]
+display-st7789 = []
 fan-emc2101 = ["dep:emc2101"]
 fan-emc2103 = ["dep:emc2103"]
 # Two fans on an EMC2302, the temperature from two TMP1075 board sensors.

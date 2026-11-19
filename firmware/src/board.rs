@@ -173,6 +173,12 @@ pub const ST7789_FLIP: bool = false;
 #[cfg(feature = "bitaxe-1300")]
 pub const ST7789_FLIP: bool = true;
 
+/// The display, as the settings name it.
+#[cfg(feature = "display-st7789")]
+pub const DISPLAY: &str = "ST7789 (320x170)";
+#[cfg(not(feature = "display-st7789"))]
+pub const DISPLAY: &str = "SSD1306 (128x32)";
+
 /// TPS40305 feedback divider: RA (R14) and RB (R15).
 #[cfg(feature = "vcore-dac")]
 pub const VCORE_RA_OHM: f32 = 4990.0;
@@ -323,3 +329,177 @@ pub const ASIC_DIFFICULTY: u32 = 256;
 
 /// Serial baudrate to the chips once they are initialized.
 pub const ASIC_BAUDRATE: u32 = 1_000_000;
+
+/// ASIC model name, cores per chip and hash domains per chip.
+#[cfg(feature = "asic-bm1397")]
+pub const ASIC_MODEL: &str = "BM1397";
+#[cfg(feature = "asic-bm1366")]
+pub const ASIC_MODEL: &str = "BM1366";
+#[cfg(feature = "asic-bm1368")]
+pub const ASIC_MODEL: &str = "BM1368";
+#[cfg(all(feature = "asic-bm1370", not(feature = "bitaxe-1201")))]
+pub const ASIC_MODEL: &str = "BM1370";
+#[cfg(feature = "bitaxe-1201")]
+pub const ASIC_MODEL: &str = "BM1372/BM1373";
+
+#[cfg(feature = "asic-bm1397")]
+pub const SMALL_CORE_COUNT: u16 = 672;
+#[cfg(feature = "asic-bm1366")]
+pub const SMALL_CORE_COUNT: u16 = 894;
+#[cfg(feature = "asic-bm1368")]
+pub const SMALL_CORE_COUNT: u16 = 1276;
+#[cfg(all(feature = "asic-bm1370", not(feature = "bitaxe-1201")))]
+pub const SMALL_CORE_COUNT: u16 = 2040;
+#[cfg(feature = "bitaxe-1201")]
+pub const SMALL_CORE_COUNT: u16 = 6725;
+
+#[cfg(feature = "asic-bm1397")]
+pub const HASH_DOMAINS: u8 = 1;
+#[cfg(any(feature = "asic-bm1366", feature = "asic-bm1368"))]
+pub const HASH_DOMAINS: u8 = 4;
+#[cfg(all(feature = "asic-bm1370", not(feature = "bitaxe-1201")))]
+pub const HASH_DOMAINS: u8 = 4;
+#[cfg(feature = "bitaxe-1201")]
+pub const HASH_DOMAINS: u8 = 8;
+
+/// Frequencies (MHz) and core voltages (mV) offered in the settings.
+#[cfg(feature = "asic-bm1397")]
+pub const FREQUENCY_OPTIONS: &[u16] = &[400, 425, 450, 475, 485, 500, 525, 550, 575, 600];
+#[cfg(feature = "asic-bm1366")]
+pub const FREQUENCY_OPTIONS: &[u16] = &[400, 425, 450, 475, 485, 500, 525, 550, 575];
+#[cfg(feature = "asic-bm1368")]
+pub const FREQUENCY_OPTIONS: &[u16] = &[400, 425, 450, 475, 485, 490, 500, 525, 550, 575];
+#[cfg(all(
+    feature = "asic-bm1370",
+    not(any(feature = "bitaxe-650", feature = "bitaxe-1201"))
+))]
+pub const FREQUENCY_OPTIONS: &[u16] = &[400, 490, 525, 550, 600, 625, 690];
+#[cfg(feature = "bitaxe-650")]
+pub const FREQUENCY_OPTIONS: &[u16] = &[350, 375, 380, 400, 410];
+#[cfg(feature = "bitaxe-1201")]
+pub const FREQUENCY_OPTIONS: &[u16] = &[327, 350, 375, 380, 400, 410];
+
+#[cfg(feature = "asic-bm1397")]
+pub const VOLTAGE_OPTIONS: &[u16] = &[1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1500];
+#[cfg(feature = "asic-bm1366")]
+pub const VOLTAGE_OPTIONS: &[u16] = &[1100, 1150, 1200, 1250, 1300];
+#[cfg(feature = "asic-bm1368")]
+pub const VOLTAGE_OPTIONS: &[u16] = &[1100, 1150, 1166, 1200, 1250, 1300];
+#[cfg(any(feature = "asic-bm1370", feature = "asic-bm1372"))]
+pub const VOLTAGE_OPTIONS: &[u16] = &[1000, 1060, 1100, 1150, 1200, 1250];
+
+/// Chips on the board, the most power it draws (W), its nominal input voltage (V), and the
+/// colour of its family in the swarm view.
+#[cfg(any(
+    feature = "bitaxe-102",
+    feature = "bitaxe-201",
+    feature = "bitaxe-202",
+    feature = "bitaxe-205",
+    feature = "bitaxe-207",
+    feature = "bitaxe-400",
+    feature = "bitaxe-401",
+    feature = "bitaxe-402",
+    feature = "bitaxe-403",
+    feature = "bitaxe-600",
+    feature = "bitaxe-601",
+    feature = "bitaxe-602",
+    feature = "bitaxe-603"
+))]
+pub const ASIC_COUNT: u8 = 1;
+#[cfg(any(
+    feature = "bitaxe-650",
+    feature = "bitaxe-801",
+    feature = "bitaxe-1201"
+))]
+pub const ASIC_COUNT: u8 = 2;
+#[cfg(any(
+    feature = "bitaxe-302",
+    feature = "bitaxe-303",
+    feature = "bitaxe-701",
+    feature = "bitaxe-702",
+    feature = "bitaxe-1300"
+))]
+pub const ASIC_COUNT: u8 = 6;
+
+#[cfg(any(
+    feature = "bitaxe-102",
+    feature = "bitaxe-201",
+    feature = "bitaxe-202",
+    feature = "bitaxe-205",
+    feature = "bitaxe-207"
+))]
+pub const MAX_POWER_W: u16 = 25;
+#[cfg(any(
+    feature = "bitaxe-400",
+    feature = "bitaxe-401",
+    feature = "bitaxe-402",
+    feature = "bitaxe-403",
+    feature = "bitaxe-600",
+    feature = "bitaxe-601",
+    feature = "bitaxe-602",
+    feature = "bitaxe-603",
+    feature = "bitaxe-650"
+))]
+pub const MAX_POWER_W: u16 = 40;
+#[cfg(any(feature = "bitaxe-801", feature = "bitaxe-1201"))]
+pub const MAX_POWER_W: u16 = 60;
+#[cfg(any(feature = "bitaxe-302", feature = "bitaxe-303"))]
+pub const MAX_POWER_W: u16 = 90;
+#[cfg(any(feature = "bitaxe-701", feature = "bitaxe-702"))]
+pub const MAX_POWER_W: u16 = 120;
+#[cfg(feature = "bitaxe-1300")]
+pub const MAX_POWER_W: u16 = 180;
+
+#[cfg(any(
+    feature = "bitaxe-302",
+    feature = "bitaxe-303",
+    feature = "bitaxe-701",
+    feature = "bitaxe-702",
+    feature = "bitaxe-801",
+    feature = "bitaxe-1201",
+    feature = "bitaxe-1300"
+))]
+pub const NOMINAL_VOLTAGE_V: u8 = 12;
+#[cfg(not(any(
+    feature = "bitaxe-302",
+    feature = "bitaxe-303",
+    feature = "bitaxe-701",
+    feature = "bitaxe-702",
+    feature = "bitaxe-801",
+    feature = "bitaxe-1201",
+    feature = "bitaxe-1300"
+)))]
+pub const NOMINAL_VOLTAGE_V: u8 = 5;
+
+#[cfg(feature = "bitaxe-102")]
+pub const SWARM_COLOR: &str = "red";
+#[cfg(any(
+    feature = "bitaxe-201",
+    feature = "bitaxe-202",
+    feature = "bitaxe-205",
+    feature = "bitaxe-207"
+))]
+pub const SWARM_COLOR: &str = "purple";
+#[cfg(any(feature = "bitaxe-302", feature = "bitaxe-303"))]
+pub const SWARM_COLOR: &str = "orange";
+#[cfg(any(
+    feature = "bitaxe-400",
+    feature = "bitaxe-401",
+    feature = "bitaxe-402",
+    feature = "bitaxe-403"
+))]
+pub const SWARM_COLOR: &str = "blue";
+#[cfg(any(
+    feature = "bitaxe-600",
+    feature = "bitaxe-601",
+    feature = "bitaxe-602",
+    feature = "bitaxe-603",
+    feature = "bitaxe-650"
+))]
+pub const SWARM_COLOR: &str = "green";
+#[cfg(any(feature = "bitaxe-701", feature = "bitaxe-702"))]
+pub const SWARM_COLOR: &str = "darkblue";
+#[cfg(any(feature = "bitaxe-801", feature = "bitaxe-1300"))]
+pub const SWARM_COLOR: &str = "cyan";
+#[cfg(feature = "bitaxe-1201")]
+pub const SWARM_COLOR: &str = "magenta";

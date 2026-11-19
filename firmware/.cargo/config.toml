@@ -3,6 +3,7 @@
 runner = [
   "probe-rs",
   "run",
+  "--idf-partition-table=partitions.csv",
   "--log-format={{t:dimmed} [{L:bold}]} {s}  {{c} {ff}:{l:1}%dimmed}",
 ]
 
