@@ -138,6 +138,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bm1368"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d85ed16eee4a5028b770ca353ad7aa6913cb114db351137a0b15d1ca826d038f"
+dependencies = [
+ "bm13xx-asic",
+ "bm13xx-protocol",
+ "defmt 1.2.0",
+ "fugit 0.6.0",
+ "heapless 0.9.3",
+]
+
+[[package]]
 name = "bm1370"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1142,6 +1155,7 @@ name = "esp-miner-rs"
 version = "0.1.0"
 dependencies = [
  "bm1366",
+ "bm1368",
  "bm1370",
  "bm1397",
  "bm13xx-chain",

@@ -81,7 +81,7 @@ async fn main(spawner: Spawner) -> ! {
         Output::new(peripherals.GPIO10, Level::High, OutputConfig::default()),
     );
     // TPS546 over PMBus, off until the power task has configured it.
-    #[cfg(feature = "bitaxe-gamma")]
+    #[cfg(any(feature = "bitaxe-supra", feature = "bitaxe-gamma"))]
     let vcore = vcore::Vcore::new(I2cDevice::new(i2c_bus));
     let emc2101 = emc2101::AsyncEMC2101::new(I2cDevice::new(i2c_bus))
         .await

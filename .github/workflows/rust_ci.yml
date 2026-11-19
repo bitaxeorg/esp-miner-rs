@@ -29,6 +29,8 @@ jobs:
           - command: build
             args: --release --features=bitaxe-ultra
           - command: build
+            args: --release --features=bitaxe-supra
+          - command: build
             args: --release --features=bitaxe-gamma
           - command: fmt
             args: --all -- --check --color always
@@ -36,6 +38,8 @@ jobs:
             args: --features=bitaxe-max --workspace -- -D warnings
           - command: clippy
             args: --features=bitaxe-ultra --workspace -- -D warnings
+          - command: clippy
+            args: --features=bitaxe-supra --workspace -- -D warnings
           - command: clippy
             args: --features=bitaxe-gamma --workspace -- -D warnings
     steps:

@@ -2,12 +2,12 @@
 //!
 //! - Max and Ultra: a TPS40305 buck whose output a DS4432 current DAC moves through its feedback
 //!   node, enabled by PWR_EN (active low), with an INA260 on the 5 V input.
-//! - Gamma: a TPS546D24A buck driven over PMBus, which also measures its input, output and
-//!   temperature.
+//! - Supra (402 and later) and Gamma: a TPS546D24A buck driven over PMBus, which also measures
+//!   its input, output and temperature.
 
 #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
 pub use dac::Vcore;
-#[cfg(feature = "bitaxe-gamma")]
+#[cfg(any(feature = "bitaxe-supra", feature = "bitaxe-gamma"))]
 pub use pmbus::{Tps546Config, Vcore};
 
 #[cfg(any(feature = "bitaxe-max", feature = "bitaxe-ultra"))]
@@ -83,7 +83,7 @@ mod dac {
     }
 }
 
-#[cfg(feature = "bitaxe-gamma")]
+#[cfg(any(feature = "bitaxe-supra", feature = "bitaxe-gamma"))]
 mod pmbus {
     use defmt::{error, info, warn};
     use embassy_time::{Duration, Timer};
