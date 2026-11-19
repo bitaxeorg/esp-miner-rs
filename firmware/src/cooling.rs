@@ -14,12 +14,22 @@ pub use emc2103_fan::Cooling;
 #[cfg(feature = "fan-emc2302")]
 pub use emc2302_fan::Cooling;
 
+/// ASIC temperatures (°C).
+#[derive(Clone, Copy)]
+pub struct Temps {
+    /// What the board measures, NaN when absent or unread.
+    pub chips: [f32; 2],
+    /// The hottest, NaN when a sensor can't be read.
+    pub hottest: f32,
+}
+
 #[cfg(feature = "fan-emc2302")]
 mod emc2302_fan {
     use defmt::{debug, error, Debug2Format};
     use emc230x::{Emc230x, FanSelect};
     use tmp1075::Tmp1075;
 
+    use super::{hottest, Temps};
     use crate::{board, power::BusDevice};
 
     /// The fans of the EMC2302.
@@ -52,23 +62,36 @@ mod emc2302_fan {
             self.set_fan(100).await;
         }
 
-        /// The hotter board sensor plus [`board::TMP1075_OFFSET_C`] (°C), NaN when one can't be
-        /// read.
-        pub async fn asic_temp(&mut self) -> f32 {
-            let mut hottest = f32::MIN;
-            for (sensor, address) in self.sensors.iter_mut().zip(board::TMP1075_ADDRESSES) {
+        /// The board sensors plus [`board::TMP1075_OFFSET_C`].
+        pub async fn asic_temp(&mut self) -> Temps {
+            let mut chips = [f32::NAN; 2];
+            for ((sensor, address), chip) in self
+                .sensors
+                .iter_mut()
+                .zip(board::TMP1075_ADDRESSES)
+                .zip(chips.iter_mut())
+            {
                 match sensor.get_temperature_float().await {
                     Ok(t) => {
                         debug!("TMP1075 {:x}: {} °C", address, t);
-                        hottest = hottest.max(t);
+                        *chip = t + board::TMP1075_OFFSET_C;
                     }
-                    Err(e) => {
-                        error!("reading the TMP1075 at {:x} failed: {}", address, e);
-                        return f32::NAN;
-                    }
+                    Err(e) => error!("reading the TMP1075 at {:x} failed: {}", address, e),
                 }
             }
-            hottest + board::TMP1075_OFFSET_C
+            Temps {
+                chips,
+                hottest: hottest(chips),
+            }
+        }
+
+        /// Speed of the first fan, `None` when it can't be read.
+        pub async fn fan_rpm(&mut self) -> Option<u16> {
+            self.fans
+                .rpm(FanSelect(FANS[0]))
+                .await
+                .ok()
+                .filter(|&rpm| rpm != u16::MAX)
         }
 
         pub async fn set_fan(&mut self, percent: u8) {
@@ -95,6 +118,7 @@ mod emc2101_fan {
     use fugit::HertzU32;
     use miner_core::thermal;
 
+    use super::Temps;
     use crate::{board, power::BusDevice};
 
     const FAN_PWM_FREQ: HertzU32 = HertzU32::Hz(5806);
@@ -108,10 +132,13 @@ mod emc2101_fan {
             Self { sensor }
         }
 
-        /// Sets up the fan output at full speed and the temperature channel.
+        /// Sets up the fan output at full speed, the TACH input and the temperature channel.
         pub async fn init(&mut self) {
             if let Err(e) = self.sensor.set_fan_pwm(FAN_PWM_FREQ, false).await {
                 error!("fan PWM setup failed: {}", e);
+            }
+            if let Err(e) = self.sensor.enable_tach_input().await {
+                error!("enabling the fan TACH input failed: {}", e);
             }
             self.set_fan(100).await;
             if let Some((ideality, beta)) = board::EMC2101_DIODE {
@@ -119,20 +146,29 @@ mod emc2101_fan {
             }
         }
 
-        /// ASIC temperature (°C), NaN when it can't be read.
-        pub async fn asic_temp(&mut self) -> f32 {
+        /// The ASIC temperature.
+        pub async fn asic_temp(&mut self) -> Temps {
             let temp = if board::ASIC_TEMP_INTERNAL {
                 self.sensor.temp_internal().await.map(f32::from)
             } else {
                 self.sensor.temp_external_precise().await
             };
-            match temp {
+            let temp = match temp {
                 Ok(t) => t + board::ASIC_TEMP_OFFSET_C,
                 Err(e) => {
                     error!("reading the ASIC temperature failed: {}", e);
                     f32::NAN
                 }
+            };
+            Temps {
+                chips: [temp, f32::NAN],
+                hottest: temp,
             }
+        }
+
+        /// Fan speed, `None` when it can't be read.
+        pub async fn fan_rpm(&mut self) -> Option<u16> {
+            self.sensor.fan_rpm().await.ok()
         }
 
         pub async fn set_fan(&mut self, percent: u8) {
@@ -174,6 +210,7 @@ mod emc2103_fan {
     use defmt::{debug, error, info};
     use emc2103::{AsyncEMC2103, BetaCompensation, Channel, ExternalDiode, PwmBase};
 
+    use super::{hottest, Temps};
     use crate::{board, power::BusDevice};
 
     pub struct Cooling {
@@ -213,20 +250,24 @@ mod emc2103_fan {
             }
         }
 
-        /// Temperature of the hotter of the two chips with a diode (°C), NaN when one can't be
-        /// read.
-        pub async fn asic_temp(&mut self) -> f32 {
+        /// The two chips with a diode.
+        pub async fn asic_temp(&mut self) -> Temps {
             let first = self.chip_temp(Channel::External1).await;
             let second = self.chip_temp(Channel::External2).await;
             debug!(
                 "ASIC diodes: External1 {} °C, External2 {} °C",
                 first, second
             );
-            if first.is_nan() || second.is_nan() {
-                f32::NAN
-            } else {
-                first.max(second)
+            let chips = [first, second];
+            Temps {
+                chips,
+                hottest: hottest(chips),
             }
+        }
+
+        /// Fan speed, `None` when it can't be read.
+        pub async fn fan_rpm(&mut self) -> Option<u16> {
+            self.sensor.fan_rpm().await.ok()
         }
 
         pub async fn set_fan(&mut self, percent: u8) {
@@ -274,5 +315,15 @@ mod emc2103_fan {
                 }
             }
         }
+    }
+}
+
+/// The hotter of two temperatures, NaN when one is NaN.
+#[cfg(any(feature = "fan-emc2103", feature = "fan-emc2302"))]
+fn hottest(chips: [f32; 2]) -> f32 {
+    if chips.iter().any(|t| t.is_nan()) {
+        f32::NAN
+    } else {
+        chips[0].max(chips[1])
     }
 }

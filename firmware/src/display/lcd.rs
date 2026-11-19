@@ -1,41 +1,50 @@
-//! Status screen on the ST7789 colour LCD (320 × 170, RGB565) on the 8-bit i80 bus of the LCD_CAM
+//! Status screens on the ST7789 colour LCD (320 × 170, RGB565) on the 8-bit i80 bus of the LCD_CAM
 //! peripheral.
 //!
-//! There is no frame buffer: each text row is drawn into the DMA buffer, then sent to its rows of
-//! the panel with one transfer.
+//! There is no frame buffer: the screen is drawn in bands of [`ROW_HEIGHT`] rows, each into the
+//! DMA buffer, then sent to its rows of the panel with one transfer.
 
-use core::{convert::Infallible, fmt::Write};
+use core::fmt::Write;
 
 use defmt::{info, warn};
 use embassy_net::Stack;
 use embassy_time::{Duration, Timer};
-use embedded_graphics::{
-    mono_font::{ascii::FONT_10X20, MonoTextStyle},
-    pixelcolor::{raw::RawU16, Rgb565},
-    prelude::*,
-    text::{Baseline, Text},
-};
 use esp_hal::{
     dma::{DmaError, DmaTxBuf},
-    gpio::Output,
+    gpio::{Input, Output},
     lcd_cam::lcd::i8080::I8080,
     Async,
 };
+use heapless::Vec;
+use miner_core::{
+    carousel::Screen,
+    ui::{column_top, Align, Font, Label},
+    units,
+};
 
-use super::{best_text, hashrate_text, ip_text, power_text, temperature_text};
-use crate::{board, status};
+use super::{
+    best_text, efficiency,
+    fonts::{
+        ANGEL_WISH_40, DIGITAL_NUMBERS_16, DIGITAL_NUMBERS_28, OPEN_SANS_BOLD_13,
+        OPEN_SANS_BOLD_14, UNSCII_16,
+    },
+    images::BACKGROUND,
+    run, Panel, Text, View,
+};
+use crate::board;
 
 const WIDTH: usize = 320;
 /// Rows of the panel, centred in the 240 rows of the controller memory.
 const HEIGHT: usize = 170;
 const ROW_OFFSET: usize = 35;
-/// Height of a text row of [`FONT_10X20`].
+/// Rows drawn and sent at once.
 const ROW_HEIGHT: usize = 20;
-/// Bytes of a text row: the size of the DMA buffer.
+/// Bytes of a band of rows: the size of the DMA buffer.
 pub const ROW_BYTES: usize = WIDTH * ROW_HEIGHT * 2;
-/// Width of the label column of the status rows.
-const LABEL_WIDTH: i32 = 100;
-const REFRESH_PERIOD: Duration = Duration::from_secs(2);
+/// Space around the column screens, and between their lines.
+const PADDING: i32 = 8;
+const LINE_PAD: i32 = 1;
+const WHITE: [u8; 2] = [0xFF, 0xFF];
 
 // ST7789 commands
 const SLPOUT: u8 = 0x11;
@@ -60,6 +69,102 @@ const RESET_PULSE: Duration = Duration::from_millis(10);
 /// Time the ST7789 needs after a reset and after leaving sleep.
 const RESET_WAIT: Duration = Duration::from_millis(120);
 const SLEEP_OUT_WAIT: Duration = Duration::from_millis(120);
+
+/// A label of the statistics screen: box, font and alignment.
+struct Placed {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    font: &'static Font,
+    align: Align,
+}
+
+const fn placed(
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    font: &'static Font,
+    align: Align,
+) -> Placed {
+    Placed {
+        x,
+        y,
+        width,
+        height,
+        font,
+        align,
+    }
+}
+
+// The statistics screen labels, on the background.
+const TITLE: Placed = placed(15, 31, 105, 42, &ANGEL_WISH_40, Align::Left);
+const IP: Placed = placed(94, 1, 100, 13, &OPEN_SANS_BOLD_13, Align::Center);
+const HASHRATE: Placed = placed(15, 126, 98, 36, &DIGITAL_NUMBERS_28, Align::Right);
+const BEST: Placed = placed(34, 99, 84, 15, &OPEN_SANS_BOLD_14, Align::Left);
+const FAN: Placed = placed(152, 70, 56, 13, &OPEN_SANS_BOLD_13, Align::Center);
+const TEMP: Placed = placed(136, 101, 45, 15, &OPEN_SANS_BOLD_14, Align::Right);
+const VIN: Placed = placed(234, 43, 70, 15, &OPEN_SANS_BOLD_14, Align::Left);
+const VCORE: Placed = placed(234, 65, 70, 15, &OPEN_SANS_BOLD_14, Align::Left);
+const CURRENT: Placed = placed(234, 87, 70, 15, &OPEN_SANS_BOLD_14, Align::Left);
+const POWER: Placed = placed(234, 109, 70, 15, &OPEN_SANS_BOLD_14, Align::Left);
+const EFFICIENCY: Placed = placed(217, 136, 60, 20, &DIGITAL_NUMBERS_16, Align::Right);
+const UPTIME: Placed = placed(20, 78, 110, 13, &OPEN_SANS_BOLD_13, Align::Right);
+
+/// A text to draw, with where and how.
+struct Item {
+    text: Text,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    font: &'static Font,
+    align: Align,
+    scroll_ms: Option<u32>,
+}
+
+impl Item {
+    fn placed(spec: &Placed, text: Text) -> Self {
+        Self {
+            text,
+            x: spec.x,
+            y: spec.y,
+            width: spec.width,
+            height: spec.height,
+            font: spec.font,
+            align: spec.align,
+            scroll_ms: None,
+        }
+    }
+
+    fn label(&self) -> Label<'_> {
+        Label {
+            font: self.font,
+            text: &self.text,
+            x: self.x,
+            y: self.y,
+            width: self.width,
+            height: self.height,
+            align: self.align,
+            scroll_ms: self.scroll_ms,
+        }
+    }
+}
+
+/// Text of a format, cut at the [`Text`] size.
+fn text(args: core::fmt::Arguments) -> Text {
+    let mut t = Text::new();
+    let _ = t.write_fmt(args);
+    t
+}
+
+/// Text of a reading with its format, or `--`.
+fn or_dashes<T>(value: Option<T>, format: impl FnOnce(T) -> Text) -> Text {
+    value
+        .map(format)
+        .unwrap_or_else(|| text(format_args!("--")))
+}
 
 /// The ST7789 on the i80 bus, with its control lines.
 pub struct Lcd {
@@ -112,10 +217,7 @@ impl Lcd {
         };
         self.command(MADCTL, &[MADCTL_MV | mirror]).await?;
         for y in (0..HEIGHT).step_by(ROW_HEIGHT) {
-            self.draw_row(y, |row| {
-                let _ = row.clear(Rgb565::BLACK);
-            })
-            .await?;
+            self.draw_band(y, |band| band.fill(0)).await?;
         }
         self.command(DISPON, &[]).await?;
         self.backlight.set_high();
@@ -129,11 +231,12 @@ impl Lcd {
         self.transfer(i8080, buf, cmd).await
     }
 
-    /// Draws the [`ROW_HEIGHT`] panel rows from `y` with `render`.
-    async fn draw_row(
+    /// Draws the [`ROW_HEIGHT`] panel rows from `y` with `render`, given those rows of the DMA
+    /// buffer (RGB565, most significant byte first).
+    async fn draw_band(
         &mut self,
         y: usize,
-        render: impl FnOnce(&mut RowBuffer<'_>),
+        render: impl FnOnce(&mut [u8]),
     ) -> Result<(), DmaError> {
         let [x0_hi, x0_lo] = 0u16.to_be_bytes();
         let [x1_hi, x1_lo] = (WIDTH as u16 - 1).to_be_bytes();
@@ -144,7 +247,7 @@ impl Lcd {
 
         let (i8080, mut buf) = self.bus.take().expect("LCD bus in use");
         buf.set_length(ROW_BYTES);
-        render(&mut RowBuffer(&mut buf.as_mut_slice()[..ROW_BYTES]));
+        render(&mut buf.as_mut_slice()[..ROW_BYTES]);
         self.transfer(i8080, buf, RAMWR).await
     }
 
@@ -167,118 +270,142 @@ impl Lcd {
         self.bus = Some((i8080, buf));
         result
     }
-}
 
-/// A text row of the panel in the DMA buffer, RGB565 most significant byte first.
-struct RowBuffer<'a>(&'a mut [u8]);
-
-impl OriginDimensions for RowBuffer<'_> {
-    fn size(&self) -> Size {
-        Size::new(WIDTH as u32, ROW_HEIGHT as u32)
-    }
-}
-
-impl DrawTarget for RowBuffer<'_> {
-    type Color = Rgb565;
-    type Error = Infallible;
-
-    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
-    where
-        I: IntoIterator<Item = Pixel<Self::Color>>,
-    {
-        for Pixel(point, color) in pixels {
-            let (Ok(x), Ok(y)) = (usize::try_from(point.x), usize::try_from(point.y)) else {
-                continue;
-            };
-            if x < WIDTH && y < ROW_HEIGHT {
-                let i = (y * WIDTH + x) * 2;
-                self.0[i..i + 2].copy_from_slice(&RawU16::from(color).into_inner().to_be_bytes());
+    /// The texts of `view`, and whether they sit on the background.
+    fn items(view: &View<'_>) -> (Vec<Item, 16>, bool) {
+        let mut items = Vec::new();
+        if view.screen == Screen::Stats {
+            let s = view.status;
+            let temp = s.chip_temps_c[0].max(s.chip_temps_c[1]);
+            for item in [
+                Item::placed(&TITLE, text(format_args!("Bitaxe"))),
+                Item::placed(
+                    &IP,
+                    view.ip.clone().unwrap_or_else(|| text(format_args!("--"))),
+                ),
+                Item::placed(&HASHRATE, text(format_args!("{:.0}", s.hashrate_ghs))),
+                Item::placed(&BEST, text(format_args!("{}", best_text(s)))),
+                Item::placed(
+                    &UPTIME,
+                    text(format_args!("{}", units::uptime_compact(view.uptime_s))),
+                ),
+                Item::placed(
+                    &FAN,
+                    or_dashes(s.fan_rpm.filter(|&r| r > 0), |r| text(format_args!("{r}"))),
+                ),
+                Item::placed(
+                    &TEMP,
+                    or_dashes((temp > 0.0).then_some(temp), |t| {
+                        text(format_args!("{t:.0}"))
+                    }),
+                ),
+                Item::placed(&VIN, or_dashes(s.vin_v, |v| text(format_args!("{v:.1}V")))),
+                Item::placed(
+                    &VCORE,
+                    or_dashes(s.vcore_v, |v| text(format_args!("{v:.2}V"))),
+                ),
+                Item::placed(
+                    &CURRENT,
+                    or_dashes(s.current_a, |a| text(format_args!("{a:.1}A"))),
+                ),
+                Item::placed(
+                    &POWER,
+                    or_dashes(s.power_w, |w| text(format_args!("{w:.1}W"))),
+                ),
+                Item::placed(
+                    &EFFICIENCY,
+                    or_dashes(efficiency(s), |e| text(format_args!("{e:.1}"))),
+                ),
+            ] {
+                let _ = items.push(item);
+            }
+        } else {
+            let lines = view.lines();
+            let line_height = i32::from(UNSCII_16.line_height);
+            let top = column_top(
+                lines.len(),
+                line_height,
+                LINE_PAD,
+                PADDING,
+                HEIGHT as i32 - 2 * PADDING,
+            );
+            for (i, (line, scroll)) in lines.into_iter().enumerate() {
+                let _ = items.push(Item {
+                    text: line,
+                    x: PADDING,
+                    y: top + i as i32 * (line_height + LINE_PAD),
+                    width: WIDTH as i32 - 2 * PADDING,
+                    height: line_height,
+                    font: &UNSCII_16,
+                    align: Align::Left,
+                    scroll_ms: scroll.then_some(view.screen_ms),
+                });
             }
         }
-        Ok(())
-    }
-
-    fn clear(&mut self, color: Self::Color) -> Result<(), Self::Error> {
-        let bytes = RawU16::from(color).into_inner().to_be_bytes();
-        for pixel in self.0.chunks_exact_mut(2) {
-            pixel.copy_from_slice(&bytes);
-        }
-        Ok(())
+        let notification = text(format_args!("{}", view.notification));
+        let width = UNSCII_16.text_width(&notification);
+        let _ = items.push(Item {
+            text: notification,
+            x: WIDTH as i32 - width,
+            y: 0,
+            width,
+            height: i32::from(UNSCII_16.line_height),
+            font: &UNSCII_16,
+            align: Align::Left,
+            scroll_ms: None,
+        });
+        (items, view.screen == Screen::Stats)
     }
 }
 
-/// Sets the LCD up, then shows the status on it every [`REFRESH_PERIOD`]. Ends when the LCD can't
-/// be set up.
+impl Panel for Lcd {
+    const LARGE: bool = true;
+
+    async fn draw(&mut self, view: &View<'_>) {
+        let (items, background) = Self::items(view);
+        for y0 in (0..HEIGHT).step_by(ROW_HEIGHT) {
+            let result = self
+                .draw_band(y0, |band| {
+                    let rows = ROW_HEIGHT.min(HEIGHT - y0);
+                    if background {
+                        let from = y0 * WIDTH * 2;
+                        band[..rows * WIDTH * 2]
+                            .copy_from_slice(&BACKGROUND[from..from + rows * WIDTH * 2]);
+                        band[rows * WIDTH * 2..].fill(0);
+                    } else {
+                        band.fill(0);
+                    }
+                    let band_top = y0 as i32;
+                    let mut plot = |x: i32, y: i32| {
+                        let row = y - band_top;
+                        if (0..WIDTH as i32).contains(&x) && (0..rows as i32).contains(&row) {
+                            let i = (row as usize * WIDTH + x as usize) * 2;
+                            band[i..i + 2].copy_from_slice(&WHITE);
+                        }
+                    };
+                    for item in &items {
+                        if item.y < band_top + ROW_HEIGHT as i32 && item.y + item.height > band_top
+                        {
+                            item.label().draw(&mut plot);
+                        }
+                    }
+                })
+                .await;
+            if let Err(e) = result {
+                warn!("LCD update failed: {}", e);
+                return;
+            }
+        }
+    }
+}
+
+/// Sets the LCD up, then shows the status screens on it. Ends when the LCD can't be set up.
 #[embassy_executor::task]
-pub async fn display_task(mut lcd: Lcd, stack: Stack<'static>) {
+pub async fn display_task(mut lcd: Lcd, stack: Stack<'static>, button: Input<'static>) {
     if let Err(e) = lcd.init().await {
         warn!("LCD setup failed: {}", e);
         return;
     }
     info!("LCD ready");
-
-    let title = MonoTextStyle::new(&FONT_10X20, Rgb565::YELLOW);
-    let label = MonoTextStyle::new(&FONT_10X20, Rgb565::CYAN);
-    let value = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
-    loop {
-        let rows = status_rows(stack);
-        if let Err(e) = lcd
-            .draw_row(0, |row| {
-                let _ = row.clear(Rgb565::BLACK);
-                let _ = Text::with_baseline("esp-miner-rs", Point::zero(), title, Baseline::Top)
-                    .draw(row);
-            })
-            .await
-        {
-            warn!("LCD update failed: {}", e);
-        }
-        for (i, (name, text)) in rows.iter().enumerate() {
-            let result = lcd
-                .draw_row((i + 1) * ROW_HEIGHT, |row| {
-                    let _ = row.clear(Rgb565::BLACK);
-                    let _ =
-                        Text::with_baseline(name, Point::zero(), label, Baseline::Top).draw(row);
-                    let _ =
-                        Text::with_baseline(text, Point::new(LABEL_WIDTH, 0), value, Baseline::Top)
-                            .draw(row);
-                })
-                .await;
-            if let Err(e) = result {
-                warn!("LCD update failed: {}", e);
-            }
-        }
-        Timer::after(REFRESH_PERIOD).await;
-    }
-}
-
-/// The labelled rows under the title: hashrate, ASIC temperature, power, shares, best difficulty,
-/// pool and IP address.
-fn status_rows(stack: Stack<'_>) -> [(&'static str, super::Text); 7] {
-    let s = status::get();
-    let mut shares = super::Text::new();
-    let _ = write!(shares, "{} / {}", s.accepted, s.rejected);
-    let mut pool = super::Text::new();
-    let _ = write!(
-        pool,
-        "{}",
-        if s.pool_connected {
-            "connected"
-        } else {
-            "connecting"
-        }
-    );
-    let ip = ip_text(stack).unwrap_or_else(|| {
-        let mut text = super::Text::new();
-        let _ = write!(text, "connecting");
-        text
-    });
-    [
-        ("Hashrate", hashrate_text(&s)),
-        ("ASIC", temperature_text(&s)),
-        ("Power", power_text(&s)),
-        ("Shares", shares),
-        ("Best", best_text(&s)),
-        ("Pool", pool),
-        ("IP", ip),
-    ]
+    run(&mut lcd, stack, button).await;
 }

@@ -11,21 +11,42 @@ pub use dac::Vcore;
 #[cfg(feature = "vcore-tps546")]
 pub use pmbus::{PhaseCount, Tps546Config, Vcore};
 
+/// What the board measures of its power, each `None` when it can't be read.
+#[derive(Clone, Copy, Default)]
+pub struct Reading {
+    pub power_w: Option<f32>,
+    pub vin_v: Option<f32>,
+    /// Core voltage of a chip.
+    pub vcore_v: Option<f32>,
+    pub current_a: Option<f32>,
+}
+
 #[cfg(feature = "vcore-dac")]
 mod dac {
     use defmt::{error, info, warn};
     use ds4432::{AsyncDS4432, Status};
-    use esp_hal::gpio::Output;
+    use esp_hal::{
+        analog::adc::{Adc, AdcCalCurve, AdcPin},
+        gpio::Output,
+        peripherals::{ADC1, GPIO2},
+        Async,
+    };
     use ina260::AsyncINA260;
     use miner_core::vcore;
 
+    use super::Reading;
     use crate::{board, power::BusDevice};
+
+    /// The ADC input wired to the core supply, calibrated.
+    pub type VcorePin = AdcPin<GPIO2<'static>, ADC1<'static>, AdcCalCurve<ADC1<'static>>>;
 
     pub struct Vcore {
         dac: AsyncDS4432<BusDevice>,
         monitor: AsyncINA260<BusDevice>,
         /// PWR_EN, active low.
         enable: Output<'static>,
+        adc: Adc<'static, ADC1<'static>, Async>,
+        vcore_pin: VcorePin,
     }
 
     impl Vcore {
@@ -33,11 +54,15 @@ mod dac {
             dac: AsyncDS4432<BusDevice>,
             monitor: AsyncINA260<BusDevice>,
             enable: Output<'static>,
+            adc: Adc<'static, ADC1<'static>, Async>,
+            vcore_pin: VcorePin,
         ) -> Self {
             Self {
                 dac,
                 monitor,
                 enable,
+                adc,
+                vcore_pin,
             }
         }
 
@@ -64,8 +89,11 @@ mod dac {
             self.enable.set_high();
         }
 
-        /// Logs the input power with the ASIC temperature, and returns the input power (W).
-        pub async fn log(&mut self, asic_temp: f32) -> Option<f32> {
+        /// Logs the input power and the core voltage with the ASIC temperature, and returns them:
+        /// the input power, voltage and current, and the core voltage on the ADC (calibrated mV).
+        pub async fn log(&mut self, asic_temp: f32) -> Reading {
+            let vcore_mv = self.adc.read_oneshot(&mut self.vcore_pin).await;
+            let vcore_v = (vcore_mv > 0).then(|| f32::from(vcore_mv) / 1000.0);
             match (
                 self.monitor.power().await,
                 self.monitor.current().await,
@@ -73,17 +101,29 @@ mod dac {
             ) {
                 (Ok(mw), Ok(ua), Ok(uv)) => {
                     info!(
-                        "ASIC {} °C, input {} mW ({} mV, {} mA)",
+                        "ASIC {} °C, input {} mW ({} mV, {} mA), core {} mV",
                         asic_temp,
                         mw,
                         uv / 1000,
-                        ua / 1000
+                        ua / 1000,
+                        vcore_mv
                     );
-                    Some(mw as f32 / 1000.0)
+                    Reading {
+                        power_w: Some(mw as f32 / 1000.0),
+                        vin_v: Some(uv as f32 / 1_000_000.0),
+                        vcore_v,
+                        current_a: Some(ua as f32 / 1_000_000.0),
+                    }
                 }
                 _ => {
-                    warn!("ASIC {} °C, reading the INA260 failed", asic_temp);
-                    None
+                    warn!(
+                        "ASIC {} °C, reading the INA260 failed, core {} mV",
+                        asic_temp, vcore_mv
+                    );
+                    Reading {
+                        vcore_v,
+                        ..Reading::default()
+                    }
                 }
             }
         }
@@ -103,6 +143,7 @@ mod pmbus {
         Tps546,
     };
 
+    use super::Reading;
     use crate::{board, power::BusDevice};
 
     /// PMBus address of the TPS546.
@@ -224,9 +265,10 @@ mod pmbus {
             }
         }
 
-        /// Logs the regulator readings with the ASIC temperature, and returns the regulator output
-        /// power (W), which leaves out the rest of the board.
-        pub async fn log(&mut self, asic_temp: f32) -> Option<f32> {
+        /// Logs the regulator readings with the ASIC temperature, and returns them: the output
+        /// power plus [`board::POWER_OFFSET_W`] for the rest of the board, the input voltage, the
+        /// output voltage of each voltage domain and the output current.
+        pub async fn log(&mut self, asic_temp: f32) -> Reading {
             match (
                 self.tps.read_vin().await,
                 self.tps.read_vout().await,
@@ -243,11 +285,16 @@ mod pmbus {
                         (vin * 1000.0) as u32,
                         temp
                     );
-                    Some(vout * iout)
+                    Reading {
+                        power_w: Some(vout * iout + board::POWER_OFFSET_W),
+                        vin_v: Some(vin),
+                        vcore_v: Some(vout / board::VOLTAGE_DOMAINS as f32),
+                        current_a: Some(iout),
+                    }
                 }
                 _ => {
                     warn!("ASIC {} °C, reading the TPS546 failed", asic_temp);
-                    None
+                    Reading::default()
                 }
             }
         }

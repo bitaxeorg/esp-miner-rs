@@ -38,7 +38,6 @@ embassy-net = { version = "0.9.1", features = [
 ] }
 embassy-sync = "0.8.0"
 embassy-time = { version = "0.5.1", features = ["defmt"] }
-embedded-graphics = { version = "0.8.2", optional = true }
 embedded-hal = "1.0.0"
 embedded-hal-async = { version = "1.0.0", features = ["defmt-03"] }
 embedded-io = "0.7.1"
@@ -77,6 +76,7 @@ esp-rtos = { version = "0.4.0", features = [
     "esp-radio",
     "esp32s3",
 ] }
+esp-wifi-sys-esp32s3 = { version = "0.3.0", optional = true }
 fugit = "0.6.0"
 # kept on 0.8: stratum-v1 0.1 API uses heapless 0.8 types
 heapless = { version = "0.8.0", default-features = false, features = [
@@ -167,9 +167,9 @@ asic-enable = []
 # ASIC temperature from the EMC2101 internal sensor plus an offset, instead of the chip's diode.
 asic-temp-internal = []
 # SSD1306 OLED (128 × 32) on the I2C bus.
-display-oled = ["dep:embedded-graphics", "dep:ssd1306"]
+display-oled = ["dep:esp-wifi-sys-esp32s3", "dep:ssd1306"]
 # ST7789 colour LCD (320 × 170) on the 8-bit i80 bus of LCD_CAM (boards with the colour display).
-display-st7789 = ["dep:embedded-graphics"]
+display-st7789 = ["dep:esp-wifi-sys-esp32s3"]
 fan-emc2101 = ["dep:emc2101"]
 fan-emc2103 = ["dep:emc2103"]
 # Two fans on an EMC2302, the temperature from two TMP1075 board sensors.

@@ -10,15 +10,27 @@ pub struct Status {
     pub hashrate_ghs: f32,
     /// Difficulty of the best nonce since boot.
     pub best_difficulty: f64,
-    /// ASIC temperature (°C), NaN until read.
+    /// Temperature of the hottest chip (°C), NaN until read.
     pub asic_temp_c: f32,
-    /// Power (W) as the board measures it, `None` until read.
+    /// The chip temperatures the board measures (°C), NaN when absent or unread.
+    pub chip_temps_c: [f32; 2],
+    pub fan_rpm: Option<u16>,
+    /// Power (W) as the board measures it.
     pub power_w: Option<f32>,
-    /// Shares the pool accepted and rejected in the current session.
+    /// Input voltage, core voltage of a chip (V) and current (A) as the board measures them.
+    pub vin_v: Option<f32>,
+    pub vcore_v: Option<f32>,
+    pub current_a: Option<f32>,
+    /// Core power cut on overheat.
+    pub overheat: bool,
+    /// Shares the pool accepted and rejected, and work it sent, in the current session.
     pub accepted: u64,
     pub rejected: u64,
+    pub work_received: u64,
     /// Whether a pool session is authorized.
     pub pool_connected: bool,
+    /// Network difficulty of the current work, 0 until known.
+    pub network_difficulty: f64,
 }
 
 impl Status {
@@ -27,10 +39,18 @@ impl Status {
             hashrate_ghs: 0.0,
             best_difficulty: 0.0,
             asic_temp_c: f32::NAN,
+            chip_temps_c: [f32::NAN; 2],
+            fan_rpm: None,
             power_w: None,
+            vin_v: None,
+            vcore_v: None,
+            current_a: None,
+            overheat: false,
             accepted: 0,
             rejected: 0,
+            work_received: 0,
             pool_connected: false,
+            network_difficulty: 0.0,
         }
     }
 }

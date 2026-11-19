@@ -81,16 +81,29 @@ async fn main(spawner: Spawner) -> ! {
     let i2c = i2c.into_async();
     let i2c_bus = I2C_BUS.init(Mutex::new(i2c));
     // DS4432 (core voltage) and INA260 (input power). The regulator enable (PWR_EN, GPIO10) is
-    // active low: off until the power task has set the core voltage.
+    // active low: off until the power task has set the core voltage. The core voltage is read
+    // on ADC1 (GPIO2), calibrated.
     #[cfg(feature = "vcore-dac")]
-    let vcore = vcore::Vcore::new(
-        ds4432::AsyncDS4432::with_rfs(I2cDevice::new(i2c_bus), Some(board::DS4432_RFS0_OHM), None)
+    let vcore = {
+        use esp_hal::analog::adc::{Adc, AdcCalCurve, AdcConfig, Attenuation};
+        let mut adc_config = AdcConfig::new();
+        let vcore_pin = adc_config
+            .enable_pin_with_cal::<_, AdcCalCurve<_>>(peripherals.GPIO2, Attenuation::_11dB);
+        vcore::Vcore::new(
+            ds4432::AsyncDS4432::with_rfs(
+                I2cDevice::new(i2c_bus),
+                Some(board::DS4432_RFS0_OHM),
+                None,
+            )
             .unwrap(),
-        ina260::AsyncINA260::new(I2cDevice::new(i2c_bus))
-            .await
-            .unwrap(),
-        Output::new(peripherals.GPIO10, Level::High, OutputConfig::default()),
-    );
+            ina260::AsyncINA260::new(I2cDevice::new(i2c_bus))
+                .await
+                .unwrap(),
+            Output::new(peripherals.GPIO10, Level::High, OutputConfig::default()),
+            Adc::new(peripherals.ADC1, adc_config).into_async(),
+            vcore_pin,
+        )
+    };
     // TPS546 over PMBus, off until the power task has configured it, and on some boards an ASIC
     // power enable (GPIO10) active high, off until then too.
     #[cfg(feature = "vcore-tps546")]
@@ -167,11 +180,18 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(connection_task(controller).unwrap());
     spawner.spawn(net_task(runner).unwrap());
 
-    // Status screen on the OLED, on the shared I2C bus
-    #[cfg(feature = "display-oled")]
-    spawner.spawn(display::display_task(I2cDevice::new(i2c_bus), stack).unwrap());
+    // The BOOT button (GPIO0, active low) moves the status screens on.
+    #[cfg(any(feature = "display-oled", feature = "display-st7789"))]
+    let button = esp_hal::gpio::Input::new(
+        peripherals.GPIO0,
+        esp_hal::gpio::InputConfig::default().with_pull(esp_hal::gpio::Pull::Up),
+    );
 
-    // Status screen on the ST7789: 8-bit i80 bus on LCD_CAM (data GPIO39 to GPIO42 and GPIO45 to
+    // Status screens on the OLED, on the shared I2C bus
+    #[cfg(feature = "display-oled")]
+    spawner.spawn(display::display_task(I2cDevice::new(i2c_bus), stack, button).unwrap());
+
+    // Status screens on the ST7789: 8-bit i80 bus on LCD_CAM (data GPIO39 to GPIO42 and GPIO45 to
     // GPIO48, WR GPIO8, DC GPIO7, CS GPIO6, 4 MHz), RD GPIO9 held high, reset GPIO5 (active low),
     // panel power GPIO15 and backlight GPIO38 (active high).
     #[cfg(feature = "display-st7789")]
@@ -206,7 +226,7 @@ async fn main(spawner: Spawner) -> ! {
             Output::new(peripherals.GPIO9, Level::High, OutputConfig::default()),
             Output::new(peripherals.GPIO15, Level::High, OutputConfig::default()),
         );
-        spawner.spawn(display::display_task(lcd, stack).unwrap());
+        spawner.spawn(display::display_task(lcd, stack, button).unwrap());
     }
 
     // Pool session

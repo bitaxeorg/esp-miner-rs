@@ -15,7 +15,7 @@ use embassy_sync::{
 };
 use embassy_time::{Duration, Timer};
 use heapless::String;
-use miner_core::job::MiningJob;
+use miner_core::{job::MiningJob, units::network_difficulty};
 use stratum_v1::{Client, Extensions, Message, Share, VersionRolling};
 
 use crate::{board, io06::Io06, status};
@@ -36,7 +36,13 @@ pub static VERSION_MASK: Mutex<CriticalSectionRawMutex, Cell<u32>> =
 /// Version rolling mask asked to the pool, and enabled in the chips.
 pub const VERSION_MASK_REQUEST: u32 = 0x1fff_e000;
 
-const POOL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::new(68, 235, 52, 36), 21496); // public-pool
+const POOL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::new(68, 235, 52, 36), 21496);
+/// Host name of [`POOL_ADDR`], shown on the display.
+#[cfg_attr(
+    not(any(feature = "display-oled", feature = "display-st7789")),
+    allow(dead_code)
+)]
+pub const POOL_HOST: &str = "public-pool.io";
 const POOL_USER: &str = "1HLQGxzAQWnLore3fWHc2W8UP1CgMv1GKQ.miner1";
 const POOL_PASS: &str = "x";
 const CLIENT_NAME: &str = "esp-miner-rs";
@@ -124,6 +130,8 @@ async fn session(
         .await?;
 
     let mut authorized = false;
+    // the pool job of the last job rolled: a new one is new work
+    let mut last_job_id = String::<32>::new();
     loop {
         let mut busy = false;
         if let Some(msg) = client.poll_message().await? {
@@ -139,6 +147,14 @@ async fn session(
                 match client.roll_job().await {
                     Ok(job) => {
                         busy = true;
+                        if job.job_id != last_job_id {
+                            last_job_id = job.job_id.clone();
+                            let difficulty = network_difficulty(job.header.nbits);
+                            status::update(|s| {
+                                s.work_received += 1;
+                                s.network_difficulty = difficulty;
+                            });
+                        }
                         let _ = JOBS.try_send(MiningJob::from_stratum_v1(
                             job.job_id,
                             job.extranonce2,
@@ -191,6 +207,7 @@ async fn handle_message(
                 s.pool_connected = true;
                 s.accepted = 0;
                 s.rejected = 0;
+                s.work_received = 0;
             });
         }
         Message::Share { accepted, rejected } => {

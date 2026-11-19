@@ -39,16 +39,24 @@ pub async fn power_task(mut vcore: Vcore, mut cooling: Cooling) {
     loop {
         Timer::after(MONITOR_PERIOD).await;
 
-        let temp = cooling.asic_temp().await;
-        let power_w = vcore.log(temp).await;
+        let temps = cooling.asic_temp().await;
+        let temp = temps.hottest;
+        let reading = vcore.log(temp).await;
+        let fan_rpm = cooling.fan_rpm().await;
         status::update(|s| {
             s.asic_temp_c = temp;
-            s.power_w = power_w;
+            s.chip_temps_c = temps.chips;
+            s.fan_rpm = fan_rpm;
+            s.power_w = reading.power_w;
+            s.vin_v = reading.vin_v;
+            s.vcore_v = reading.vcore_v;
+            s.current_a = reading.current_a;
         });
 
         if temp > thermal::OVERHEAT_C {
             vcore.off().await;
             cooling.set_fan(100).await;
+            status::update(|s| s.overheat = true);
             error!(
                 "ASIC overheat ({} °C > {} °C): core power cut until reboot",
                 temp,

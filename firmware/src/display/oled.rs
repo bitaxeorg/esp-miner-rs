@@ -1,36 +1,104 @@
-//! Status screen on the I2C OLED (SSD1306, 128 × 32).
-
-use core::fmt::Write;
+//! Status screens on the I2C OLED (SSD1306, 128 × 32), in the 6 × 8 font.
 
 use defmt::{info, warn, Debug2Format};
 use embassy_net::Stack;
-use embassy_time::{Duration, Timer};
-use embedded_graphics::{
-    mono_font::{ascii::FONT_6X10, MonoTextStyle},
-    pixelcolor::BinaryColor,
-    prelude::*,
-    text::{Baseline, Text},
-};
 use embedded_hal_async::i2c::I2c;
-use heapless::String;
-use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306Async};
+use esp_hal::gpio::Input;
+use miner_core::{
+    carousel::Screen,
+    ui::{column_top, Align, Label},
+};
+use ssd1306::{
+    mode::BufferedGraphicsModeAsync, prelude::*, size::DisplaySize128x32, I2CDisplayInterface,
+    Ssd1306Async,
+};
 
-use super::{best_text, hashrate_text, ip_text, power_text, temperature_text};
-use crate::{power::BusDevice, status};
+use super::{fonts::PORTFOLIO_6X8, images, run, Panel, View};
+use crate::power::BusDevice;
 
 /// I2C addresses an OLED can answer at.
 const ADDRESS: u8 = 0x3C;
 const ALTERNATE_ADDRESS: u8 = 0x3D;
 /// Display off: control byte (command), then the command.
 const DISPLAY_OFF: [u8; 2] = [0x00, 0xAE];
-const REFRESH_PERIOD: Duration = Duration::from_secs(2);
-/// Height of a text line of [`FONT_6X10`], plus one pixel.
-const LINE_HEIGHT: i32 = 11;
+const WIDTH: i32 = 128;
+const HEIGHT: i32 = 32;
+/// Space between the logo screen texts and the right edge.
+const LOGO_TEXT_MARGIN: i32 = 8;
 
-/// Finds the OLED, then shows the status on it every [`REFRESH_PERIOD`]. Ends at once when no
-/// OLED answers.
+type Display = Ssd1306Async<
+    I2CInterface<BusDevice>,
+    DisplaySize128x32,
+    BufferedGraphicsModeAsync<DisplaySize128x32>,
+>;
+
+struct Oled(Display);
+
+impl Panel for Oled {
+    const LARGE: bool = false;
+
+    async fn draw(&mut self, view: &View<'_>) {
+        let display = &mut self.0;
+        display.clear_buffer();
+        let mut plot = |x: i32, y: i32| {
+            if (0..WIDTH).contains(&x) && (0..HEIGHT).contains(&y) {
+                display.set_pixel(x as u32, y as u32, true);
+            }
+        };
+        let font = &PORTFOLIO_6X8;
+        let line_height = i32::from(font.line_height);
+        match view.screen {
+            Screen::BitaxeLogo => {
+                let logo = &images::BITAXE_LOGO;
+                logo.draw(
+                    (WIDTH - logo.width) / 2,
+                    (HEIGHT - logo.height) / 2 + 1,
+                    &mut plot,
+                );
+                // name and board number right aligned, above the vertical middle
+                for (text, dy) in [(env!("BOARD_NAME"), -12), (env!("BOARD_VERSION"), -4)] {
+                    let x = WIDTH - LOGO_TEXT_MARGIN - font.text_width(text);
+                    font.draw(text, x, (HEIGHT - line_height) / 2 + dy, &mut plot);
+                }
+            }
+            Screen::OsmuLogo => {
+                let logo = &images::OSMU_LOGO;
+                logo.draw(
+                    (WIDTH - logo.width) / 2,
+                    (HEIGHT - logo.height) / 2,
+                    &mut plot,
+                );
+            }
+            _ => {
+                let lines = view.lines();
+                let top = column_top(lines.len(), line_height, 0, 0, HEIGHT);
+                for (i, (text, scroll)) in lines.iter().enumerate() {
+                    Label {
+                        font,
+                        text,
+                        x: 0,
+                        y: top + i as i32 * line_height,
+                        width: WIDTH,
+                        height: line_height,
+                        align: Align::Left,
+                        scroll_ms: scroll.then_some(view.screen_ms),
+                    }
+                    .draw(&mut plot);
+                }
+            }
+        }
+        let x = WIDTH - font.text_width(view.notification);
+        font.draw(view.notification, x, 0, &mut plot);
+
+        if let Err(e) = display.flush().await {
+            warn!("OLED display update failed: {}", Debug2Format(&e));
+        }
+    }
+}
+
+/// Finds the OLED, then shows the status screens on it. Ends at once when no OLED answers.
 #[embassy_executor::task]
-pub async fn display_task(mut bus: BusDevice, stack: Stack<'static>) {
+pub async fn display_task(mut bus: BusDevice, stack: Stack<'static>, button: Input<'static>) {
     let interface = if bus.write(ADDRESS, &DISPLAY_OFF).await.is_ok() {
         I2CDisplayInterface::new(bus)
     } else if bus.write(ALTERNATE_ADDRESS, &DISPLAY_OFF).await.is_ok() {
@@ -46,53 +114,5 @@ pub async fn display_task(mut bus: BusDevice, stack: Stack<'static>) {
         return;
     }
     info!("OLED display found");
-
-    let style = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
-    loop {
-        display.clear_buffer();
-        for (i, line) in status_lines(stack).iter().enumerate() {
-            let position = Point::new(0, i as i32 * LINE_HEIGHT);
-            // drawing to the frame buffer can't fail
-            let _ = Text::with_baseline(line, position, style, Baseline::Top).draw(&mut display);
-        }
-        if let Err(e) = display.flush().await {
-            warn!("OLED display update failed: {}", Debug2Format(&e));
-        }
-        Timer::after(REFRESH_PERIOD).await;
-    }
-}
-
-/// The three lines of 21 characters of the status screen: hashrate, temperature and power; the
-/// pool shares and best difficulty; the IP address.
-fn status_lines(stack: Stack<'_>) -> [String<24>; 3] {
-    let s = status::get();
-    let mut lines: [String<24>; 3] = Default::default();
-    // a line too long for its buffer is cut, which writing ignores
-    let _ = write!(
-        lines[0],
-        "{} {} {}",
-        hashrate_text(&s),
-        temperature_text(&s),
-        power_text(&s)
-    );
-    if s.pool_connected {
-        let _ = write!(
-            lines[1],
-            "A{} R{} B{}",
-            s.accepted,
-            s.rejected,
-            best_text(&s)
-        );
-    } else {
-        let _ = write!(lines[1], "pool: connecting");
-    }
-    match ip_text(stack) {
-        Some(ip) => {
-            let _ = write!(lines[2], "{ip}");
-        }
-        None => {
-            let _ = write!(lines[2], "WiFi: connecting");
-        }
-    }
-    lines
+    run(&mut Oled(display), stack, button).await;
 }

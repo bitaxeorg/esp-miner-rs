@@ -293,6 +293,31 @@ pub const TPS546: crate::vcore::Tps546Config = crate::vcore::Tps546Config {
     iout_oc_fault: 160.0,
 };
 
+/// Power of the rest of the board, added to the TPS546 output power (W).
+#[cfg(any(
+    feature = "bitaxe-207",
+    feature = "bitaxe-402",
+    feature = "bitaxe-403",
+    feature = "bitaxe-600",
+    feature = "bitaxe-601",
+    feature = "bitaxe-602",
+    feature = "bitaxe-603",
+    feature = "bitaxe-650"
+))]
+pub const POWER_OFFSET_W: f32 = 5.0;
+#[cfg(any(feature = "bitaxe-302", feature = "bitaxe-303"))]
+pub const POWER_OFFSET_W: f32 = 12.0;
+#[cfg(any(
+    feature = "bitaxe-701",
+    feature = "bitaxe-702",
+    feature = "bitaxe-1300"
+))]
+pub const POWER_OFFSET_W: f32 = 25.0;
+#[cfg(feature = "bitaxe-801")]
+pub const POWER_OFFSET_W: f32 = 10.0;
+#[cfg(feature = "bitaxe-1201")]
+pub const POWER_OFFSET_W: f32 = 0.0;
+
 /// ASIC difficulty (ticket mask): chips only report nonces at least this difficult.
 pub const ASIC_DIFFICULTY: u32 = 256;
 

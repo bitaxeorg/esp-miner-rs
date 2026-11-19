@@ -28,10 +28,13 @@ This is a proof of concept:
 - The BitaxeMax can't mine yet: the BM1397 needs midstates, which [bm13xx-rs] doesn't compute yet.
 - The WiFi credentials are compiled in, and the pool address, worker and password are constants
   at the top of `firmware/src/pool.rs`.
-- A status screen shows the hashrate, ASIC temperature and power, pool shares and best difficulty,
-  and IP address: on the SSD1306 OLED (128 × 32) of the boards with the original pins, on the
-  ST7789 colour LCD (320 × 170) of the NajaDuo and GammaHex. No web interface or settings storage
-  yet.
+- The display shows the AxeOS screens: on the SSD1306 OLED (128 × 32) of the boards with the
+  original pins, the connection screen, the Bitaxe and OSMU logos, then the URLs, statistics,
+  mining and Wi-Fi screens in a loop (the BOOT button moves on); on the ST7789 colour LCD
+  (320 × 170) of the NajaDuo and GammaHex, the connection screen then the statistics screen on its
+  background. What still differs from AxeOS (block height and scriptsig, all-time best, setup,
+  self-test and update screens, display settings) is listed in [TODO.md](TODO.md). No web interface
+  or settings storage yet.
 
 ## Architecture
 
@@ -44,10 +47,14 @@ This is a proof of concept:
     on overheat
   - `asic.rs`: brings the chain up with [bm13xx-rs], feeds it jobs and checks the nonces
   - `pool.rs`: the Stratum v1 session
-  - `status.rs`: the status the tasks fill in, and `display.rs`: the status screen, on the OLED
-    (`display/oled.rs`) or the colour LCD over LCD_CAM and DMA (`display/lcd.rs`)
-- `miner-core/`: the hardware independent mining logic (block header, share check, job book,
-  hashrate meter, core voltage, fan curve, units), tested on the host
+  - `status.rs`: the status the tasks fill in, and `display.rs`: the screens, drawn on the OLED
+    (`display/oled.rs`) or on the colour LCD over LCD_CAM and DMA (`display/lcd.rs`), with their
+    fonts and images (`display/fonts.rs`, `display/images.rs`)
+- `miner-core/`: the hardware independent logic (block header, share check, job book, hashrate
+  meter, core voltage, fan curve, coinbase, units, screen carousel and text drawing), tested on
+  the host
+- `tools/display-assets/`: converts the LVGL fonts and images of ESP-Miner's `main/` (and LVGL's
+  `lv_font_unscii_16.c`) into the display assets of the firmware
 - drivers: [bm13xx-rs] for the ASICs, [tps546], [emc2101], [emc2103], [emc230x], [tmp1075],
   [ds4432], [ina260] and [ssd1306]
 
@@ -84,6 +91,8 @@ with timing-sensitive peripherals of `esp-hal`: use `--release` for anything you
 - `just build gamma` to build esp-miner-rs for the [BitaxeGamma], `just build 401` for a [BitaxeSupra] 401
 - `just run gamma` to build, flash and run esp-miner-rs on the connected board
 - `just test` to run the `miner-core` tests on the host
+- `just display-assets <ESP-Miner>/main <LVGL>/src/font/lv_font_unscii_16.c` to regenerate the
+  display fonts and images
 
 ### Manually
 - `cd firmware`
