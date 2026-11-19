@@ -5,11 +5,14 @@
 
 #![cfg_attr(not(test), no_std)]
 
+pub mod carousel;
+pub mod coinbase;
 pub mod hashrate;
 pub mod header;
 pub mod job;
 pub mod share;
 pub mod thermal;
 pub mod timing;
+pub mod ui;
 pub mod units;
 pub mod vcore;
