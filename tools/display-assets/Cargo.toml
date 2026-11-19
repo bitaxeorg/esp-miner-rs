@@ -1,0 +1,9 @@
+[package]
+name = "display-assets"
+version = "0.1.0"
+authors = ["Georges Palauqui <g.palauqui@gptechinno.com>"]
+edition = "2021"
+description = "Converts the LVGL fonts and images of the displays into the firmware's display assets"
+repository = "https://github.com/bitaxeorg/esp-miner-rs"
+license = "MIT OR Apache-2.0"
+publish = false

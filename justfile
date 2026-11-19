@@ -11,3 +11,7 @@ run b:
 
 test:
   cargo test
+
+# regenerate the display fonts and images from their LVGL sources
+display-assets sources unscii:
+  cargo run -p display-assets -- $sources $unscii

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["miner-core"]
+members = ["miner-core", "tools/display-assets"]
 # The firmware targets xtensa-esp32s3-none-elf with build-std (see firmware/.cargo/config.toml),
 # so it is built from its own directory, outside of this host workspace.
 exclude = ["firmware"]
