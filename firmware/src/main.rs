@@ -6,7 +6,6 @@ mod board;
 mod cooling;
 #[cfg(any(feature = "display-oled", feature = "display-st7789"))]
 mod display;
-mod io06;
 mod pool;
 mod power;
 mod status;

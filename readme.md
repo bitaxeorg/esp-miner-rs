@@ -32,8 +32,8 @@ This is a proof of concept:
   original pins, the connection screen, the Bitaxe and OSMU logos, then the URLs, statistics,
   mining and Wi-Fi screens in a loop (the BOOT button moves on); on the ST7789 colour LCD
   (320 × 170) of the NajaDuo and GammaHex, the connection screen then the statistics screen on its
-  background. What still differs from AxeOS (block height and scriptsig, all-time best, setup,
-  self-test and update screens, display settings) is listed in [TODO.md](TODO.md). No web interface
+  background. What still differs from AxeOS (all-time best, setup, self-test and update screens,
+  display settings) is listed in [TODO.md](TODO.md). No web interface
   or settings storage yet.
 
 ## Architecture

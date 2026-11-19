@@ -36,8 +36,8 @@ pub use lcd::{display_task, Lcd, ROW_BYTES};
 #[cfg(feature = "display-oled")]
 pub use oled::display_task;
 
-/// A text of the screens, cut at its buffer size.
-type Text = String<64>;
+/// A text of the screens, long enough for the longest: a scriptsig.
+type Text = String<{ miner_core::coinbase::SCRIPTSIG_LEN + 1 }>;
 
 const REFRESH_PERIOD: Duration = Duration::from_millis(200);
 /// How long a notification shows.
@@ -116,8 +116,10 @@ impl View<'_> {
                 }
             }
             Screen::Mining => {
-                // the stratum client doesn't expose the coinbase: no block height nor scriptsig
-                line(false, format_args!("Block: --"));
+                match &s.coinbase {
+                    Some(c) => line(false, format_args!("Block: {}", c.block_height)),
+                    None => line(false, format_args!("Block: --")),
+                }
                 if s.network_difficulty > 0.0 {
                     let difficulty = units::suffix_string(s.network_difficulty as u64);
                     line(false, format_args!("Difficulty: {difficulty}"));
@@ -125,7 +127,10 @@ impl View<'_> {
                     line(false, format_args!("Difficulty: --"));
                 }
                 line(false, format_args!("Scriptsig:"));
-                line(true, format_args!("--"));
+                match &s.coinbase {
+                    Some(c) => line(true, format_args!("{}", c.scriptsig)),
+                    None => line(true, format_args!("--")),
+                }
             }
             Screen::Wifi => {
                 line(false, format_args!("Wi-Fi Signal"));

@@ -36,12 +36,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c583acf993cf4245c4acb0a2cc2ab1f9cc097de73411bb6d3647ff6af2b1013d"
 
 [[package]]
-name = "arrayvec"
-version = "0.7.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
-
-[[package]]
 name = "as-slice"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -63,12 +57,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b7e4c2464d97fe331d41de9d5db0def0a96f4d823b8b32a2efd503578988973"
 
 [[package]]
-name = "bitcoin_hashes"
-version = "0.14.101"
+name = "bitcoin-consensus-encoding"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bca4c7abb40c8817d77403c880988cfd484f23ab2365726afb2f798363e2c4a2"
+checksum = "9daa31138eb443d5751b207f3f64154e2bb09cd59960562ccc7a7112be38147f"
 dependencies = [
- "hex-conservative",
+ "bitcoin-internals 0.7.0",
+]
+
+[[package]]
+name = "bitcoin-internals"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d573f4cf32996a8dce612e4348cece65a241f1882ed594047c9ba348e8869fa5"
+
+[[package]]
+name = "bitcoin-internals"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8bea3a9f0cfece4564e37cb49a38cc245ca5184719e50d7d0dda3268722c4e2"
+
+[[package]]
+name = "bitcoin_hashes"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5304e53726dbe5f93141535e102ed97b5bf4714fbecefdda8f9fb98d7fdaff0e"
+dependencies = [
+ "bitcoin-consensus-encoding",
+ "bitcoin-internals 0.6.0",
 ]
 
 [[package]]
@@ -209,7 +225,7 @@ checksum = "1d4d818d103d55b6a916e10425812c1ef097fcd4d4bdaf943c88ea121ab661f1"
 dependencies = [
  "bm13xx-protocol",
  "defmt 1.2.0",
- "derive_more 2.1.1",
+ "derive_more",
  "fugit 0.6.0",
 ]
 
@@ -222,7 +238,7 @@ dependencies = [
  "bm13xx-asic",
  "bm13xx-protocol",
  "defmt 1.2.0",
- "derive_more 2.1.1",
+ "derive_more",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
  "embedded-io-async 0.7.0",
@@ -238,7 +254,7 @@ checksum = "31c7a311ba1fdb6b0725d8b60a8177e12ef39284e8506c8f565f52da79e8c8d3"
 dependencies = [
  "crc",
  "defmt 1.2.0",
- "derive_more 2.1.1",
+ "derive_more",
  "heapless 0.9.3",
 ]
 
@@ -584,31 +600,11 @@ dependencies = [
 
 [[package]]
 name = "derive_more"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a9b99b9cbbe49445b21764dc0625032a89b145a2642e67603e1c936f5458d05"
-dependencies = [
- "derive_more-impl 1.0.0",
-]
-
-[[package]]
-name = "derive_more"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d751e9e49156b02b44f9c1815bcb94b984cdcc4396ecc32521c739452808b134"
 dependencies = [
- "derive_more-impl 2.1.1",
-]
-
-[[package]]
-name = "derive_more-impl"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb7330aeadfbe296029522e6c40f315320aba36fc43a5b3632f3795348f3bd22"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "derive_more-impl",
 ]
 
 [[package]]
@@ -1284,9 +1280,7 @@ dependencies = [
  "embassy-time",
  "embedded-hal 1.0.0",
  "embedded-hal-async",
- "embedded-io 0.6.1",
  "embedded-io 0.7.1",
- "embedded-io-async 0.6.1",
  "embedded-io-async 0.7.0",
  "emc2101",
  "emc2103",
@@ -1299,7 +1293,7 @@ dependencies = [
  "esp-rtos",
  "esp-wifi-sys-esp32s3",
  "fugit 0.6.0",
- "heapless 0.8.0",
+ "heapless 0.9.3",
  "ina260",
  "miner-core",
  "pmbus-adapter",
@@ -1681,11 +1675,11 @@ dependencies = [
 
 [[package]]
 name = "faster-hex"
-version = "0.10.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04839bdf9d8c10f66806fad16b852fc72aab80873aebc3cb69d85b4fa41543ed"
+checksum = "6d8d873f78e1d3e1998ed2084da9147e3cd2bb34b67814cd49a3902b970eb124"
 dependencies = [
- "autocfg",
+ "defmt 0.3.101",
  "heapless 0.8.0",
 ]
 
@@ -1833,7 +1827,6 @@ checksum = "0bfb9eb618601c89945a70e254898da93b13be0388091d42117462b265bb3fad"
 dependencies = [
  "defmt 0.3.101",
  "hash32 0.3.1",
- "serde",
  "stable_deref_trait",
 ]
 
@@ -1845,6 +1838,7 @@ checksum = "25ba4bd83f9415b58b4ed8dc5714c76e626a105be4646c02630ad730ad3b5aa4"
 dependencies = [
  "defmt 1.2.0",
  "hash32 0.3.1",
+ "serde_core",
  "stable_deref_trait",
 ]
 
@@ -1853,15 +1847,6 @@ name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
-
-[[package]]
-name = "hex-conservative"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db3fef046dca3ca91ee1408a8c1b80ab777e80a4d308d1bf4e7adb3fcb047e08"
-dependencies = [
- "arrayvec",
-]
 
 [[package]]
 name = "hybrid-array"
@@ -2104,7 +2089,7 @@ version = "0.1.0"
 dependencies = [
  "bitcoin_hashes",
  "defmt 1.2.0",
- "heapless 0.8.0",
+ "heapless 0.9.3",
 ]
 
 [[package]]
@@ -2507,11 +2492,12 @@ dependencies = [
 
 [[package]]
 name = "serde-json-core"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b81787e655bd59cecadc91f7b6b8651330b2be6c33246039a65e5cd6f4e0828"
+checksum = "d51e6795fbc00a1b26d78c7a0dbda143215d9dd0ee27c8a63ae0e1ccd6b83706"
 dependencies = [
- "heapless 0.8.0",
+ "defmt 1.2.0",
+ "heapless 0.9.3",
  "ryu",
  "serde",
 ]
@@ -2663,15 +2649,17 @@ dependencies = [
 
 [[package]]
 name = "stratum-v1"
-version = "0.1.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50e099ec137196685dff06236cef5a54b14cf67e430e6a24a23c58c02f713fe2"
+checksum = "d1f45f8803df98b8ddd8cc0e416682fa5cbf44a55799dd513bfd75433fff01c6"
 dependencies = [
  "bitcoin_hashes",
- "derive_more 1.0.0",
- "embedded-io-async 0.6.1",
+ "defmt 1.2.0",
+ "derive_more",
+ "embedded-io-async 0.7.0",
  "faster-hex",
- "heapless 0.8.0",
+ "heapless 0.9.3",
+ "rustversion",
  "serde",
  "serde-json-core",
 ]

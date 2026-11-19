@@ -24,7 +24,7 @@ pub struct MiningJob {
 impl MiningJob {
     /// Builds a job from the fields of a `stratum_v1::Job`.
     ///
-    /// stratum-v1 0.1 gives `prev_blockhash` in display order and `merkle_root` in internal byte
+    /// stratum-v1 gives `prev_blockhash` in display order and `merkle_root` in internal byte
     /// order.
     pub fn from_stratum_v1(
         pool_job_id: String<32>,

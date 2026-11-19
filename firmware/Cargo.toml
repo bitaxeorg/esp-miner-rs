@@ -42,9 +42,6 @@ embedded-hal = "1.0.0"
 embedded-hal-async = { version = "1.0.0", features = ["defmt-03"] }
 embedded-io = "0.7.1"
 embedded-io-async = "0.7.0"
-# stratum-v1 0.1 still uses the embedded-io 0.6 traits, see src/io06.rs
-embedded-io-06 = { package = "embedded-io", version = "0.6.1" }
-embedded-io-async-06 = { package = "embedded-io-async", version = "0.6.1" }
 emc2101 = { version = "4.2.0", default-features = false, optional = true, features = [
     "async",
     "defmt",
@@ -78,10 +75,7 @@ esp-rtos = { version = "0.4.0", features = [
 ] }
 esp-wifi-sys-esp32s3 = { version = "0.3.0", optional = true }
 fugit = "0.6.0"
-# kept on 0.8: stratum-v1 0.1 API uses heapless 0.8 types
-heapless = { version = "0.8.0", default-features = false, features = [
-    "defmt-03",
-] }
+heapless = { version = "0.9.3", default-features = false, features = ["defmt"] }
 ina260 = { version = "0.4.0", features = [
     "defmt",
 ], git = "https://github.com/Georges760/ina260.git", rev = "30dd697cf20ab7fc1f6e55d22823adf18afc86b0", optional = true }
@@ -100,7 +94,7 @@ smoltcp = { version = "0.13.0", default-features = false, features = [
     "socket-udp",
 ] }
 static_cell = { version = "2.1.1", features = ["nightly"] }
-stratum-v1 = "0.1.0"
+stratum-v1 = { version = "0.5.0", features = ["defmt"] }
 tmp1075 = { version = "0.2.0", default-features = false, optional = true, features = [
     "async",
 ] }

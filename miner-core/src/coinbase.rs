@@ -9,7 +9,7 @@ pub const SCRIPTSIG_LEN: usize = 99;
 /// the previous output hash (32) and index (4).
 const SCRIPTSIG_LEN_OFFSET: usize = 41;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CoinbaseInfo {
     /// Block height (BIP 34), at the start of the scriptsig.
     pub block_height: u32,

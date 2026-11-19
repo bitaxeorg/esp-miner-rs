@@ -2,7 +2,7 @@
 
 use core::{cell::Cell, convert::Infallible, net::Ipv4Addr, str::FromStr};
 
-use defmt::{error, info, Debug2Format};
+use defmt::{error, info, warn};
 use embassy_futures::select::select;
 use embassy_net::{
     tcp::{ConnectError, TcpSocket},
@@ -15,10 +15,10 @@ use embassy_sync::{
 };
 use embassy_time::{Duration, Timer};
 use heapless::String;
-use miner_core::{job::MiningJob, units::network_difficulty};
+use miner_core::{coinbase::coinbase_info, job::MiningJob, units::network_difficulty};
 use stratum_v1::{Client, Extensions, Message, Share, VersionRolling};
 
-use crate::{board, io06::Io06, status};
+use crate::{board, status};
 
 /// Jobs rolled from the pool work, ready for the chips.
 pub static JOBS: Channel<CriticalSectionRawMutex, MiningJob, 2> = Channel::new();
@@ -55,7 +55,7 @@ const RECONNECT_DELAY: Duration = Duration::from_secs(5);
 const SOCKET_TIMEOUT: Duration = Duration::from_secs(300);
 const SOCKET_KEEP_ALIVE: Duration = Duration::from_secs(60);
 
-type StratumClient<'a> = Client<Io06<TcpSocket<'a>>, 1480, 512>;
+type StratumClient<'a> = Client<TcpSocket<'a>, 1480, 512>;
 
 enum SessionError {
     Connect(ConnectError),
@@ -66,8 +66,7 @@ impl defmt::Format for SessionError {
     fn format(&self, fmt: defmt::Formatter) {
         match self {
             Self::Connect(e) => defmt::write!(fmt, "connect error: {}", e),
-            // stratum-v1 0.1 can't be built with defmt
-            Self::Stratum(e) => defmt::write!(fmt, "stratum error: {}", Debug2Format(e)),
+            Self::Stratum(e) => defmt::write!(fmt, "stratum error: {}", e),
         }
     }
 }
@@ -98,8 +97,8 @@ pub async fn pool_task(
     }
 }
 
-/// Runs one session. stratum-v1 0.1 leaves a line it failed to parse in its buffer, so any error
-/// ends the session.
+/// Runs one session, until the connection fails or the client can't send. A pool message the
+/// client can't parse is dropped, and the session goes on.
 async fn session(
     stack: Stack<'_>,
     rx_buf: &mut [u8],
@@ -115,7 +114,7 @@ async fn session(
         .map_err(SessionError::Connect)?;
     info!("connected!");
 
-    let mut client = StratumClient::new(Io06(socket));
+    let mut client = StratumClient::new(socket);
     client.enable_software_rolling(false, true, false);
     client
         .send_configure(Extensions {
@@ -130,13 +129,19 @@ async fn session(
         .await?;
 
     let mut authorized = false;
-    // the pool job of the last job rolled: a new one is new work
-    let mut last_job_id = String::<32>::new();
     loop {
         let mut busy = false;
-        if let Some(msg) = client.poll_message().await? {
-            busy = true;
-            handle_message(&mut client, msg, &mut authorized).await?;
+        match client.poll_message().await {
+            Ok(Some(msg)) => {
+                busy = true;
+                handle_message(&mut client, msg, &mut authorized).await?;
+            }
+            Ok(None) => {}
+            Err(stratum_v1::Error::Network) => return Err(stratum_v1::Error::Network.into()),
+            Err(e) => {
+                busy = true;
+                warn!("pool message dropped: {}", e);
+            }
         }
         if authorized {
             while let Ok(share) = SHARES.try_receive() {
@@ -147,14 +152,6 @@ async fn session(
                 match client.roll_job().await {
                     Ok(job) => {
                         busy = true;
-                        if job.job_id != last_job_id {
-                            last_job_id = job.job_id.clone();
-                            let difficulty = network_difficulty(job.header.nbits);
-                            status::update(|s| {
-                                s.work_received += 1;
-                                s.network_difficulty = difficulty;
-                            });
-                        }
                         let _ = JOBS.try_send(MiningJob::from_stratum_v1(
                             job.job_id,
                             job.extranonce2,
@@ -219,10 +216,28 @@ async fn handle_message(
         }
         Message::VersionMask(mask) => VERSION_MASK.lock(|m| m.set(mask)),
         Message::Difficulty(diff) => POOL_DIFFICULTY.lock(|d| d.set(diff)),
-        Message::CleanJobs => {
-            // the new work is already in the client: the jobs rolled next use it
-            JOBS.clear();
-            CLEAN_JOBS.signal(());
+        Message::Work { clean_jobs } => {
+            if clean_jobs {
+                // the new work is already in the client: the jobs rolled next use it
+                JOBS.clear();
+                CLEAN_JOBS.signal(());
+            }
+            let difficulty = client
+                .work()
+                .map_or(0.0, |work| network_difficulty(work.nbits));
+            let coinbase = client.work().and_then(|work| {
+                coinbase_info(
+                    &work.coinb1,
+                    &work.coinb2,
+                    client.extranonce1().len(),
+                    client.extranonce2_size(),
+                )
+            });
+            status::update(|s| {
+                s.work_received += 1;
+                s.network_difficulty = difficulty;
+                s.coinbase = coinbase;
+            });
         }
     }
     Ok(())

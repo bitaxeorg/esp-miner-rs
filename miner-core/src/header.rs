@@ -1,6 +1,6 @@
 //! Block header serialization, hashing and difficulty.
 
-use bitcoin_hashes::{sha256d, Hash};
+use bitcoin_hashes::sha256d;
 
 /// 2^208, built from its bits to stay exact.
 const TWO_POW_208: f64 = f64::from_bits((1023u64 + 208) << 52);

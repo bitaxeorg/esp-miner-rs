@@ -1,10 +1,11 @@
 //! Miner status, filled in by the tasks and shown on the display.
 
-use core::cell::Cell;
+use core::cell::RefCell;
 
 use embassy_sync::blocking_mutex::{raw::CriticalSectionRawMutex, Mutex};
+use miner_core::coinbase::CoinbaseInfo;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Status {
     /// Measured from the nonces of the last minutes (GH/s).
     pub hashrate_ghs: f32,
@@ -31,6 +32,8 @@ pub struct Status {
     pub pool_connected: bool,
     /// Network difficulty of the current work, 0 until known.
     pub network_difficulty: f64,
+    /// Block height and scriptsig of the current work, when its coinbase could be read.
+    pub coinbase: Option<CoinbaseInfo>,
 }
 
 impl Status {
@@ -51,23 +54,21 @@ impl Status {
             work_received: 0,
             pool_connected: false,
             network_difficulty: 0.0,
+            coinbase: None,
         }
     }
 }
 
-static STATUS: Mutex<CriticalSectionRawMutex, Cell<Status>> = Mutex::new(Cell::new(Status::new()));
+static STATUS: Mutex<CriticalSectionRawMutex, RefCell<Status>> =
+    Mutex::new(RefCell::new(Status::new()));
 
 /// The current status.
 #[cfg(any(feature = "display-oled", feature = "display-st7789"))]
 pub fn get() -> Status {
-    STATUS.lock(Cell::get)
+    STATUS.lock(|status| status.borrow().clone())
 }
 
 /// Changes the status with `f`.
 pub fn update(f: impl FnOnce(&mut Status)) {
-    STATUS.lock(|status| {
-        let mut s = status.get();
-        f(&mut s);
-        status.set(s);
-    });
+    STATUS.lock(|status| f(&mut status.borrow_mut()));
 }

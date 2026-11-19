@@ -6,10 +6,6 @@ The screens follow AxeOS (ESP-Miner) except for the following.
 
 ### Missing data
 
-- **Mining screen: block height and scriptsig** show `--`. `stratum-v1` 0.1 keeps the coinbase
-  private: it needs to expose `coinb1`, `coinb2` and the extranonce sizes of the job. The decoder is
-  ready (`miner_core::coinbase::coinbase_info`); call it on each new job and add both values to
-  `Status`.
 - **Stats screen: all-time best difficulty.** AxeOS shows `Best: <session>/<all time>`; we show the
   session best only. Needs settings storage (NVS) to keep the best across reboots.
 - **Pool host** is the `pool::POOL_HOST` constant. AxeOS shows the URL of the pool in use, primary
