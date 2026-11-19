@@ -164,6 +164,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bm1372"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "796fa07112a467886afd867a950d7b433cbb1bec20e779f9a7d805c272129b54"
+dependencies = [
+ "bm13xx-asic",
+ "bm13xx-protocol",
+ "defmt 1.2.0",
+ "fugit 0.6.0",
+ "heapless 0.9.3",
+]
+
+[[package]]
 name = "bm1397"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1171,6 +1184,7 @@ dependencies = [
  "bm1366",
  "bm1368",
  "bm1370",
+ "bm1372",
  "bm1397",
  "bm13xx-chain",
  "bm13xx-protocol",

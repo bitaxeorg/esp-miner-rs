@@ -58,17 +58,24 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
-    // Power on I2C0 (SDA GPIO47, SCL GPIO48): the core regulator (see `vcore`) and the fan
-    // controller, which also reads the ASIC temperature (see `cooling`).
+    // Power on I2C0 (SDA GPIO47, SCL GPIO48, or GPIO44 and GPIO43 on the boards with the colour
+    // display): the core regulator (see `vcore`) and the fan controller, which also reads the
+    // ASIC temperature (see `cooling`).
     static I2C_BUS: StaticCell<Mutex<NoopRawMutex, I2c<'_, esp_hal::Async>>> = StaticCell::new();
     let i2c = I2c::new(
         peripherals.I2C0,
         esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
     )
-    .unwrap()
-    .with_sda(peripherals.GPIO47)
-    .with_scl(peripherals.GPIO48)
-    .into_async();
+    .unwrap();
+    #[cfg(not(feature = "pins-color"))]
+    let i2c = i2c
+        .with_sda(peripherals.GPIO47)
+        .with_scl(peripherals.GPIO48);
+    #[cfg(feature = "pins-color")]
+    let i2c = i2c
+        .with_sda(peripherals.GPIO44)
+        .with_scl(peripherals.GPIO43);
+    let i2c = i2c.into_async();
     let i2c_bus = I2C_BUS.init(Mutex::new(i2c));
     // DS4432 (core voltage) and INA260 (input power). The regulator enable (PWR_EN, GPIO10) is
     // active low: off until the power task has set the core voltage.
@@ -81,9 +88,20 @@ async fn main(spawner: Spawner) -> ! {
             .unwrap(),
         Output::new(peripherals.GPIO10, Level::High, OutputConfig::default()),
     );
-    // TPS546 over PMBus, off until the power task has configured it.
+    // TPS546 over PMBus, off until the power task has configured it, and on some boards an ASIC
+    // power enable (GPIO10) active high, off until then too.
     #[cfg(feature = "vcore-tps546")]
-    let vcore = vcore::Vcore::new(I2cDevice::new(i2c_bus));
+    let vcore = vcore::Vcore::new(
+        I2cDevice::new(i2c_bus),
+        #[cfg(feature = "asic-enable")]
+        Some(Output::new(
+            peripherals.GPIO10,
+            Level::Low,
+            OutputConfig::default(),
+        )),
+        #[cfg(not(feature = "asic-enable"))]
+        None,
+    );
     #[cfg(feature = "fan-emc2101")]
     let cooling = cooling::Cooling::new(
         emc2101::AsyncEMC2101::new(I2cDevice::new(i2c_bus))

@@ -2,7 +2,8 @@
 //!
 //! - `fan-emc2101`: one ASIC, whose temperature is the EMC2101 internal sensor plus an offset
 //!   (`asic-temp-internal`) or the chip's diode on the external channel.
-//! - `fan-emc2103`: one ASIC on each external diode channel, the fan driven by direct setting.
+//! - `fan-emc2103`: one ASIC on each external diode channel, with the ideality and beta of
+//!   `board::EMC2103_DIODE` when set, the fan driven by direct setting.
 
 #[cfg(feature = "fan-emc2101")]
 pub use emc2101_fan::Cooling;
@@ -93,8 +94,8 @@ mod emc2101_fan {
 #[cfg(feature = "fan-emc2103")]
 mod emc2103_fan {
     use bounded_integer::BoundedU8;
-    use defmt::{debug, error};
-    use emc2103::{AsyncEMC2103, Channel};
+    use defmt::{debug, error, info};
+    use emc2103::{AsyncEMC2103, BetaCompensation, Channel, ExternalDiode};
 
     use crate::{board, power::BusDevice};
 
@@ -107,7 +108,8 @@ mod emc2103_fan {
             Self { sensor }
         }
 
-        /// Sets up the fan output (open drain, normal polarity, direct setting) at full speed.
+        /// Sets up the fan output (open drain, normal polarity, direct setting) at full speed and
+        /// the temperature channels.
         pub async fn init(&mut self) {
             if let Err(e) = self.sensor.set_pwm_output(false, false).await {
                 error!("fan PWM setup failed: {}", e);
@@ -119,6 +121,9 @@ mod emc2103_fan {
                 error!("setting the fan to direct drive failed: {}", e);
             }
             self.set_fan(100).await;
+            if let Some((ideality, beta)) = board::EMC2103_DIODE {
+                self.configure_diodes(ideality, beta).await;
+            }
         }
 
         /// Temperature of the hottest ASIC (°C), NaN when one can't be read.
@@ -144,6 +149,34 @@ mod emc2103_fan {
             if let Err(e) = self.sensor.set_fan_percent(percent).await {
                 error!("setting the fan to {}% failed: {}", percent.get(), e);
             }
+        }
+
+        /// Sets the ideality factor and beta compensation of both external channels to the chips'
+        /// diodes.
+        async fn configure_diodes(&mut self, ideality: u8, beta: BetaCompensation) {
+            let Some(ideality) = BoundedU8::new(ideality) else {
+                error!("invalid EMC2103 ideality factor {:x}", ideality);
+                return;
+            };
+            for diode in [ExternalDiode::External1, ExternalDiode::External2] {
+                if let Err(e) = self.sensor.set_ideality_factor(diode, ideality).await {
+                    error!(
+                        "setting the EMC2103 {} ideality factor failed: {}",
+                        diode, e
+                    );
+                }
+                if let Err(e) = self.sensor.set_beta_compensation(diode, beta).await {
+                    error!(
+                        "setting the EMC2103 {} beta compensation failed: {}",
+                        diode, e
+                    );
+                }
+            }
+            info!(
+                "EMC2103 diodes: ideality {:x}, beta {}",
+                ideality.get(),
+                beta
+            );
         }
 
         /// Temperature of the chip on `channel` (°C), NaN when it can't be read.

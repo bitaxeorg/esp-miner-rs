@@ -88,6 +88,7 @@ mod dac {
 mod pmbus {
     use defmt::{error, info, warn};
     use embassy_time::{Duration, Timer};
+    use esp_hal::gpio::Output;
     use pmbus_adapter::PmbusAdaptor;
     use smbus_adapter::SmbusAdaptor;
     pub use tps546::PhaseCount;
@@ -109,6 +110,8 @@ mod pmbus {
     const ID_FIRST_DELAY: Duration = Duration::from_millis(15);
     const ID_RETRY_DELAY: Duration = Duration::from_millis(3);
     const ID_ATTEMPTS: usize = 6;
+    /// Time for the ASIC power enable to settle before the regulator is used.
+    const ENABLE_SETTLE: Duration = Duration::from_millis(20);
 
     const SWITCH_FREQ_KHZ: f32 = 650.0;
     /// Output limits and margins, relative to VOUT_COMMAND (the TPS546 default format).
@@ -153,31 +156,40 @@ mod pmbus {
 
     pub struct Vcore {
         tps: Tps546<BusDevice>,
+        /// ASIC power enable, active high, on the boards that have one.
+        enable: Option<Output<'static>>,
     }
 
     impl Vcore {
-        pub fn new(bus: BusDevice) -> Self {
+        pub fn new(bus: BusDevice, enable: Option<Output<'static>>) -> Self {
             Self {
                 tps: Tps546::new(PmbusAdaptor::new(SmbusAdaptor::new(bus)), ADDRESS),
+                enable,
             }
         }
 
-        /// Configures the regulator, output off, then sets the output to `volts` and turns it on.
+        /// Enables the ASIC power, configures the regulator with the output off, then sets the
+        /// output to `volts` for each of the [`board::VOLTAGE_DOMAINS`] in series and turns it on.
         /// False when the core power stays off.
         pub async fn on(&mut self, volts: f32) -> bool {
             let config = &board::TPS546;
-            if !(config.vout_min..=config.vout_max).contains(&volts) {
+            let vout = volts * board::VOLTAGE_DOMAINS as f32;
+            if !(config.vout_min..=config.vout_max).contains(&vout) {
                 error!(
-                    "core voltage {} V outside of {} V to {} V",
-                    volts, config.vout_min, config.vout_max
+                    "regulator output {} V outside of {} V to {} V",
+                    vout, config.vout_min, config.vout_max
                 );
                 return false;
+            }
+            if let Some(enable) = &mut self.enable {
+                enable.set_high();
+                Timer::after(ENABLE_SETTLE).await;
             }
             if !self.identify().await {
                 error!("no TPS546 found");
                 return false;
             }
-            if let Err(e) = self.configure(config, volts).await {
+            if let Err(e) = self.configure(config, vout).await {
                 error!("configuring the TPS546 failed: {}", e);
                 return false;
             }
@@ -190,11 +202,17 @@ mod pmbus {
                 Ok(op) => warn!("TPS546 OPERATION reads {:x} after turning on", op.to_raw()),
                 Err(e) => warn!("reading the TPS546 OPERATION failed: {}", e),
             }
-            info!("core voltage set to {} V", volts);
+            info!(
+                "core voltage set to {} V (regulator output {} V)",
+                volts, vout
+            );
             true
         }
 
         pub async fn off(&mut self) {
+            if let Some(enable) = &mut self.enable {
+                enable.set_low();
+            }
             if let Err(e) = self.tps.set_operation(Operation::from_raw(0x00)).await {
                 error!("turning the TPS546 output off failed: {}", e);
             }

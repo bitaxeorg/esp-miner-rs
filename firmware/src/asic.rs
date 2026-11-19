@@ -128,6 +128,7 @@ async fn run_chain(
     Timer::after(RESET_DURATION).await;
     let mut chain = Chain::enumerate(board::Asic::default(), uart, NoBusy, reset, Delay).await?;
     info!("enumerated {} ASIC(s)", chain.asic_cnt);
+    chain.set_domain_cnt(board::VOLTAGE_DOMAINS);
     chain.init(board::ASIC_DIFFICULTY).await?;
     chain.change_baudrate(board::ASIC_BAUDRATE).await?;
     chain.reset_all_cores().await?;

@@ -24,7 +24,7 @@ jobs:
       fail-fast: false
       matrix:
         # Every board number; the family names are aliases of some of them.
-        board: [102, 201, 202, 205, 207, 400, 401, 402, 403, 600, 601, 602, 603, 801]
+        board: [102, 201, 202, 205, 207, 400, 401, 402, 403, 600, 601, 602, 603, 801, 1201]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -72,6 +72,8 @@ jobs:
             args: --features=bitaxe-gamma --workspace -- -D warnings
           - command: clippy
             args: --features=bitaxe-gamma-turbo --workspace -- -D warnings
+          - command: clippy
+            args: --features=bitaxe-naja-duo --workspace -- -D warnings
           - command: clippy
             args: --features=bitaxe-205 --workspace -- -D warnings
           - command: clippy

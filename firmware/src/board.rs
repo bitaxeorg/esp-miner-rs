@@ -17,13 +17,14 @@ const BOARD_FEATURES: usize = cfg!(feature = "bitaxe-102") as usize
     + cfg!(feature = "bitaxe-601") as usize
     + cfg!(feature = "bitaxe-602") as usize
     + cfg!(feature = "bitaxe-603") as usize
-    + cfg!(feature = "bitaxe-801") as usize;
+    + cfg!(feature = "bitaxe-801") as usize
+    + cfg!(feature = "bitaxe-1201") as usize;
 const _: () = assert!(
     BOARD_FEATURES == 1,
     "You must activate exactly one board feature: a board number (bitaxe-102, bitaxe-201, \
      bitaxe-202, bitaxe-205, bitaxe-207, bitaxe-400, bitaxe-401, bitaxe-402, bitaxe-403, \
-     bitaxe-600, bitaxe-601, bitaxe-602, bitaxe-603, bitaxe-801) or a family name (bitaxe-max, \
-     bitaxe-ultra, bitaxe-supra, bitaxe-gamma, bitaxe-gamma-turbo)"
+     bitaxe-600, bitaxe-601, bitaxe-602, bitaxe-603, bitaxe-801, bitaxe-1201) or a family name \
+     (bitaxe-max, bitaxe-ultra, bitaxe-supra, bitaxe-gamma, bitaxe-gamma-turbo, bitaxe-naja-duo)"
 );
 
 /// ASIC driver.
@@ -35,6 +36,8 @@ pub type Asic = bm1366::BM1366;
 pub type Asic = bm1368::BM1368;
 #[cfg(feature = "asic-bm1370")]
 pub type Asic = bm1370::BM1370;
+#[cfg(feature = "asic-bm1372")]
+pub type Asic = bm1372::BM1372;
 
 /// Core voltage (V).
 #[cfg(feature = "asic-bm1397")]
@@ -45,6 +48,14 @@ pub const VCORE: f32 = 1.2;
 pub const VCORE: f32 = 1.166;
 #[cfg(feature = "asic-bm1370")]
 pub const VCORE: f32 = 1.15;
+#[cfg(feature = "asic-bm1372")]
+pub const VCORE: f32 = 1.0;
+
+/// Voltage domains in series on the core supply, each holding the same number of chips.
+#[cfg(feature = "bitaxe-1201")]
+pub const VOLTAGE_DOMAINS: usize = 2;
+#[cfg(not(feature = "bitaxe-1201"))]
+pub const VOLTAGE_DOMAINS: usize = 1;
 
 /// Hash frequency (MHz).
 #[cfg(feature = "asic-bm1397")]
@@ -55,6 +66,8 @@ pub const HASH_FREQ_MHZ: u64 = 485;
 pub const HASH_FREQ_MHZ: u64 = 490;
 #[cfg(feature = "asic-bm1370")]
 pub const HASH_FREQ_MHZ: u64 = 525;
+#[cfg(feature = "asic-bm1372")]
+pub const HASH_FREQ_MHZ: u64 = 327;
 
 /// Whether the chip rolls the version itself. Without it (BM1397) the host must send midstates.
 #[cfg(feature = "asic-bm1397")]
@@ -100,6 +113,16 @@ pub const EMC2101_DIODE: Option<(u8, u8)> = None;
 /// Whether External Diode 1 of the EMC2103 is on the second chip of the chain instead of the first.
 #[cfg(feature = "bitaxe-801")]
 pub const EMC2103_TEMP_FLIP: bool = true;
+#[cfg(feature = "bitaxe-1201")]
+pub const EMC2103_TEMP_FLIP: bool = false;
+
+/// EMC2103 settings for the chips' diodes, on both external channels: ideality factor register
+/// value and beta compensation. `None` keeps the device defaults.
+#[cfg(feature = "bitaxe-801")]
+pub const EMC2103_DIODE: Option<(u8, emc2103::BetaCompensation)> = None;
+#[cfg(feature = "bitaxe-1201")]
+pub const EMC2103_DIODE: Option<(u8, emc2103::BetaCompensation)> =
+    Some((0x17, emc2103::BetaCompensation::Auto));
 
 /// TPS40305 feedback divider: RA (R14) and RB (R15).
 #[cfg(feature = "vcore-dac")]
@@ -118,7 +141,10 @@ pub const DS4432_RFS0_OHM: u32 = 80_000;
 pub const DS4432_RFS0_OHM: u32 = 80_600;
 
 /// TPS546 settings for the 5 V input, single phase.
-#[cfg(all(feature = "vcore-tps546", not(feature = "bitaxe-801")))]
+#[cfg(all(
+    feature = "vcore-tps546",
+    not(any(feature = "bitaxe-801", feature = "bitaxe-1201"))
+))]
 pub const TPS546: crate::vcore::Tps546Config = crate::vcore::Tps546Config {
     phase: 0x00,
     stack: crate::vcore::PhaseCount::Single,
@@ -150,6 +176,24 @@ pub const TPS546: crate::vcore::Tps546Config = crate::vcore::Tps546Config {
     vout_max: 3.0,
     iout_oc_warn: 50.0,
     iout_oc_fault: 55.0,
+};
+
+/// TPS546 settings for the 12 V input, two phases with SYNC auto-detected, for two voltage domains.
+#[cfg(feature = "bitaxe-1201")]
+pub const TPS546: crate::vcore::Tps546Config = crate::vcore::Tps546Config {
+    phase: 0xFF,
+    stack: crate::vcore::PhaseCount::TwoPhase,
+    sync: 0xD0,
+    compensation: Some([0x12, 0x34, 0x42, 0x25, 0x04]),
+    vin_on: 11.0,
+    vin_off: 10.5,
+    vin_uv_warn: Some(11.0),
+    vin_ov_fault: 14.0,
+    vout_scale_loop: 0.125,
+    vout_min: 1.8,
+    vout_max: 3.0,
+    iout_oc_warn: 61.0,
+    iout_oc_fault: 68.0,
 };
 
 /// ASIC difficulty (ticket mask): chips only report nonces at least this difficult.
