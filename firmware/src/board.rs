@@ -9,6 +9,8 @@ const BOARD_FEATURES: usize = cfg!(feature = "bitaxe-102") as usize
     + cfg!(feature = "bitaxe-202") as usize
     + cfg!(feature = "bitaxe-205") as usize
     + cfg!(feature = "bitaxe-207") as usize
+    + cfg!(feature = "bitaxe-302") as usize
+    + cfg!(feature = "bitaxe-303") as usize
     + cfg!(feature = "bitaxe-400") as usize
     + cfg!(feature = "bitaxe-401") as usize
     + cfg!(feature = "bitaxe-402") as usize
@@ -17,16 +19,20 @@ const BOARD_FEATURES: usize = cfg!(feature = "bitaxe-102") as usize
     + cfg!(feature = "bitaxe-601") as usize
     + cfg!(feature = "bitaxe-602") as usize
     + cfg!(feature = "bitaxe-603") as usize
+    + cfg!(feature = "bitaxe-650") as usize
+    + cfg!(feature = "bitaxe-701") as usize
+    + cfg!(feature = "bitaxe-702") as usize
     + cfg!(feature = "bitaxe-801") as usize
     + cfg!(feature = "bitaxe-1201") as usize
     + cfg!(feature = "bitaxe-1300") as usize;
 const _: () = assert!(
     BOARD_FEATURES == 1,
     "You must activate exactly one board feature: a board number (bitaxe-102, bitaxe-201, \
-     bitaxe-202, bitaxe-205, bitaxe-207, bitaxe-400, bitaxe-401, bitaxe-402, bitaxe-403, \
-     bitaxe-600, bitaxe-601, bitaxe-602, bitaxe-603, bitaxe-801, bitaxe-1201, bitaxe-1300) or a family \
-     name (bitaxe-max, bitaxe-ultra, bitaxe-supra, bitaxe-gamma, bitaxe-gamma-turbo, \
-     bitaxe-naja-duo, bitaxe-gamma-hex)"
+     bitaxe-202, bitaxe-205, bitaxe-207, bitaxe-302, bitaxe-303, bitaxe-400, bitaxe-401, \
+     bitaxe-402, bitaxe-403, bitaxe-600, bitaxe-601, bitaxe-602, bitaxe-603, bitaxe-650, \
+     bitaxe-701, bitaxe-702, bitaxe-801, bitaxe-1201, bitaxe-1300) or a family name (bitaxe-max, \
+     bitaxe-ultra, bitaxe-hex, bitaxe-supra, bitaxe-gamma, bitaxe-gamma-duo, bitaxe-supra-hex, \
+     bitaxe-gamma-turbo, bitaxe-naja-duo, bitaxe-gamma-hex)"
 );
 
 /// ASIC driver.
@@ -58,7 +64,21 @@ pub const VCORE: f32 = 1.0;
 /// Voltage domains in series on the core supply, each holding the same number of chips.
 #[cfg(any(feature = "bitaxe-1201", feature = "bitaxe-1300"))]
 pub const VOLTAGE_DOMAINS: usize = 2;
-#[cfg(not(any(feature = "bitaxe-1201", feature = "bitaxe-1300")))]
+#[cfg(any(
+    feature = "bitaxe-302",
+    feature = "bitaxe-303",
+    feature = "bitaxe-701",
+    feature = "bitaxe-702"
+))]
+pub const VOLTAGE_DOMAINS: usize = 3;
+#[cfg(not(any(
+    feature = "bitaxe-1201",
+    feature = "bitaxe-1300",
+    feature = "bitaxe-302",
+    feature = "bitaxe-303",
+    feature = "bitaxe-701",
+    feature = "bitaxe-702"
+)))]
 pub const VOLTAGE_DOMAINS: usize = 1;
 
 /// Hash frequency (MHz).
@@ -68,8 +88,13 @@ pub const HASH_FREQ_MHZ: u64 = 425;
 pub const HASH_FREQ_MHZ: u64 = 485;
 #[cfg(feature = "asic-bm1368")]
 pub const HASH_FREQ_MHZ: u64 = 490;
-#[cfg(all(feature = "asic-bm1370", not(feature = "bitaxe-1300")))]
+#[cfg(all(
+    feature = "asic-bm1370",
+    not(any(feature = "bitaxe-650", feature = "bitaxe-1300"))
+))]
 pub const HASH_FREQ_MHZ: u64 = 525;
+#[cfg(feature = "bitaxe-650")]
+pub const HASH_FREQ_MHZ: u64 = 400;
 #[cfg(feature = "bitaxe-1300")]
 pub const HASH_FREQ_MHZ: u64 = 690;
 #[cfg(feature = "asic-bm1372")]
@@ -102,7 +127,8 @@ pub const ASIC_TEMP_OFFSET_C: f32 = 0.0;
     feature = "bitaxe-600",
     feature = "bitaxe-601",
     feature = "bitaxe-602",
-    feature = "bitaxe-603"
+    feature = "bitaxe-603",
+    feature = "bitaxe-650"
 ))]
 pub const EMC2101_DIODE: Option<(u8, u8)> = Some((0x24, 0x00));
 #[cfg(all(
@@ -111,10 +137,20 @@ pub const EMC2101_DIODE: Option<(u8, u8)> = Some((0x24, 0x00));
         feature = "bitaxe-600",
         feature = "bitaxe-601",
         feature = "bitaxe-602",
-        feature = "bitaxe-603"
+        feature = "bitaxe-603",
+        feature = "bitaxe-650"
     ))
 ))]
 pub const EMC2101_DIODE: Option<(u8, u8)> = None;
+
+/// I2C addresses of the EMC2302 and of the two TMP1075 board sensors.
+#[cfg(feature = "fan-emc2302")]
+pub const EMC2302_ADDRESS: u8 = 0x2F;
+#[cfg(feature = "fan-emc2302")]
+pub const TMP1075_ADDRESSES: [u8; 2] = [0x4A, 0x4B];
+/// The ASIC temperature is the hotter TMP1075 board sensor plus this offset.
+#[cfg(feature = "fan-emc2302")]
+pub const TMP1075_OFFSET_C: f32 = 10.0;
 
 /// Whether the EMC2103 PWM output is push-pull at 26 kHz, instead of open drain at the default
 /// base frequency.
@@ -147,10 +183,36 @@ pub const DS4432_RFS0_OHM: u32 = 80_000;
 ))]
 pub const DS4432_RFS0_OHM: u32 = 80_600;
 
+/// TPS546 settings for the 12 V input, single phase, for three voltage domains.
+#[cfg(any(
+    feature = "bitaxe-302",
+    feature = "bitaxe-303",
+    feature = "bitaxe-701",
+    feature = "bitaxe-702"
+))]
+pub const TPS546: crate::vcore::Tps546Config = crate::vcore::Tps546Config {
+    phase: 0x00,
+    stack: crate::vcore::PhaseCount::Single,
+    sync: 0x10,
+    compensation: None,
+    vin_on: 11.5,
+    vin_off: 11.0,
+    vin_uv_warn: Some(11.0),
+    vin_ov_fault: 14.8,
+    vout_scale_loop: 0.125,
+    vout_min: 2.5,
+    vout_max: 4.5,
+    iout_oc_warn: 25.0,
+    iout_oc_fault: 30.0,
+};
 /// TPS546 settings for the 5 V input, single phase.
 #[cfg(all(
     feature = "vcore-tps546",
     not(any(
+        feature = "bitaxe-302",
+        feature = "bitaxe-303",
+        feature = "bitaxe-701",
+        feature = "bitaxe-702",
         feature = "bitaxe-801",
         feature = "bitaxe-1201",
         feature = "bitaxe-1300"

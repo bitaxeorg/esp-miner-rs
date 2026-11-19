@@ -4,11 +4,88 @@
 //!   (`asic-temp-internal`) or the chip's diode on the external channel.
 //! - `fan-emc2103`: a chip diode on each external channel, with the ideality and beta of
 //!   `board::EMC2103_DIODE` when set, the fan driven by direct setting.
+//! - `fan-emc2302`: two fans on an EMC2302 driven together, the ASIC temperature from two TMP1075
+//!   board sensors plus an offset.
 
 #[cfg(feature = "fan-emc2101")]
 pub use emc2101_fan::Cooling;
 #[cfg(feature = "fan-emc2103")]
 pub use emc2103_fan::Cooling;
+#[cfg(feature = "fan-emc2302")]
+pub use emc2302_fan::Cooling;
+
+#[cfg(feature = "fan-emc2302")]
+mod emc2302_fan {
+    use defmt::{debug, error, Debug2Format};
+    use emc230x::{Emc230x, FanSelect};
+    use tmp1075::Tmp1075;
+
+    use crate::{board, power::BusDevice};
+
+    /// The fans of the EMC2302.
+    const FANS: [u16; 2] = [1, 2];
+
+    pub struct Cooling {
+        fans: Emc230x<BusDevice>,
+        sensors: [Tmp1075<BusDevice>; 2],
+    }
+
+    impl Cooling {
+        pub fn new(fans: Emc230x<BusDevice>, sensors: [Tmp1075<BusDevice>; 2]) -> Self {
+            Self { fans, sensors }
+        }
+
+        /// Sets the fan outputs to open drain (the driver sets them push-pull) and the fans to
+        /// full speed.
+        pub async fn init(&mut self) {
+            match self.fans.pwm_output_config().await {
+                Ok(mut config) => {
+                    for fan in FANS {
+                        config.open_drain(fan);
+                    }
+                    if let Err(e) = self.fans.set_pwm_output_config(config).await {
+                        error!("fan PWM setup failed: {}", Debug2Format(&e));
+                    }
+                }
+                Err(e) => error!("reading the fan PWM setup failed: {}", Debug2Format(&e)),
+            }
+            self.set_fan(100).await;
+        }
+
+        /// The hotter board sensor plus [`board::TMP1075_OFFSET_C`] (°C), NaN when one can't be
+        /// read.
+        pub async fn asic_temp(&mut self) -> f32 {
+            let mut hottest = f32::MIN;
+            for (sensor, address) in self.sensors.iter_mut().zip(board::TMP1075_ADDRESSES) {
+                match sensor.get_temperature_float().await {
+                    Ok(t) => {
+                        debug!("TMP1075 {:x}: {} °C", address, t);
+                        hottest = hottest.max(t);
+                    }
+                    Err(e) => {
+                        error!("reading the TMP1075 at {:x} failed: {}", address, e);
+                        return f32::NAN;
+                    }
+                }
+            }
+            hottest + board::TMP1075_OFFSET_C
+        }
+
+        pub async fn set_fan(&mut self, percent: u8) {
+            let percent = percent.min(100);
+            for fan in FANS {
+                if let Err(e) = self.fans.set_duty_cycle(FanSelect(fan), percent).await {
+                    error!(
+                        "setting fan {} to {}% failed: {}",
+                        fan,
+                        percent,
+                        Debug2Format(&e)
+                    );
+                }
+            }
+        }
+    }
+}
 
 #[cfg(feature = "fan-emc2101")]
 mod emc2101_fan {

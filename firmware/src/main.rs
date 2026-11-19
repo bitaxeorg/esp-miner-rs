@@ -114,6 +114,14 @@ async fn main(spawner: Spawner) -> ! {
             .await
             .unwrap(),
     );
+    #[cfg(feature = "fan-emc2302")]
+    let cooling = cooling::Cooling::new(
+        emc230x::Emc230x::new(I2cDevice::new(i2c_bus), board::EMC2302_ADDRESS)
+            .await
+            .unwrap(),
+        board::TMP1075_ADDRESSES
+            .map(|address| tmp1075::Tmp1075::with_address(address, I2cDevice::new(i2c_bus))),
+    );
     spawner.spawn(power::power_task(vcore, cooling).unwrap());
 
     // ASIC chain: UART1 (TX GPIO17, RX GPIO18), NRST on GPIO1 (active low).

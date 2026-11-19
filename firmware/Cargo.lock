@@ -67,6 +67,12 @@ dependencies = [
 
 [[package]]
 name = "bitfield"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f798d2d157e547aa99aab0967df39edd0b70307312b6f8bd2848e6abe40896e0"
+
+[[package]]
+name = "bitfield"
 version = "0.19.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b45721c9db4c7a20899d05efb7ad9235f50b256e980db30ffb229abf732934c3"
@@ -1002,6 +1008,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "emc230x"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b4ee5018e8ba8191d48e5e32c8eeec8ac4e7dcbca33e58d594de32cab38ba94"
+dependencies = [
+ "bitfield 0.17.0",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "emc230x-macros",
+ "fans",
+ "num_enum",
+ "thiserror",
+]
+
+[[package]]
+name = "emc230x-macros"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cbff7294e1af34e26fefbc83c52e5cfc6bae1896074611b62178111debb2cb5a"
+dependencies = [
+ "darling 0.20.11",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "enumset"
 version = "1.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1100,7 +1133,7 @@ version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c9e3dfd511fed638fe41fdb4595f8c7f0cbb488d0f0cf2bbc063d76d805057cf"
 dependencies = [
- "bitfield",
+ "bitfield 0.19.5",
  "bytemuck",
  "critical-section",
  "defmt 1.2.0",
@@ -1206,6 +1239,7 @@ dependencies = [
  "embedded-io-async 0.7.0",
  "emc2101",
  "emc2103",
+ "emc230x",
  "esp-alloc",
  "esp-backtrace",
  "esp-bootloader-esp-idf",
@@ -1221,6 +1255,7 @@ dependencies = [
  "smoltcp",
  "static_cell",
  "stratum-v1",
+ "tmp1075",
  "tps546",
 ]
 
@@ -1580,6 +1615,15 @@ checksum = "d8b4f101d37c233fe88b2b5e6d27fedab934a52f804e34f52b4b9d4d5ba2ea63"
 dependencies = [
  "critical-section",
  "vcell",
+]
+
+[[package]]
+name = "fans"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4b86613c9c9b40d8af3c93f0d9b7d3350f32dbac5e7770f1a8d44eda484b598"
+dependencies = [
+ "thiserror",
 ]
 
 [[package]]
@@ -1970,6 +2014,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "maybe-async-cfg"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8dbfaa67a76e2623580df07d6bb5e7956c0a4bae4b418314083a9c619bd66627"
+dependencies = [
+ "manyhow",
+ "proc-macro2",
+ "pulldown-cmark 0.11.3",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "maybe-async-cfg2"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1977,7 +2034,7 @@ checksum = "9df1f5459b0b8b64cccd0986c29cce07056b3351828eeee9008674aaf4e3de28"
 dependencies = [
  "manyhow",
  "proc-macro2",
- "pulldown-cmark",
+ "pulldown-cmark 0.13.6",
  "quote",
  "syn 1.0.109",
 ]
@@ -2039,6 +2096,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "num_enum"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d0bca838442ec211fa11de3a8b0e0e8f3a4522575b5c4c06ed722e005036f26"
+dependencies = [
+ "num_enum_derive",
+ "rustversion",
+]
+
+[[package]]
+name = "num_enum_derive"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "680998035259dcfcafe653688bf2aa6d3e2dc05e98be6ab46afb089dc84f1df8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2143,6 +2221,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "pulldown-cmark"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "679341d22c78c6c649893cbd6c3278dcbe9fc4faa62fea3a9296ae2b50c14625"
+dependencies = [
+ "bitflags 2.13.2",
+ "memchr",
+ "unicase",
 ]
 
 [[package]]
@@ -2597,6 +2686,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ad99c4c6d32803332c548b1af0540b357b3f5fc0be8f6c6bfe8b2e6ae784070"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "tmp1075"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99ff1a0da5c011c33c31e8b2540b00197372557473351ff6bdf8d657b5bd93a8"
+dependencies = [
+ "embedded-hal-async",
+ "maybe-async-cfg",
 ]
 
 [[package]]

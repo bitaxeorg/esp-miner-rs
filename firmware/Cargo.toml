@@ -53,6 +53,7 @@ emc2103 = { version = "0.1.0", default-features = false, optional = true, featur
     "async",
     "defmt",
 ] }
+emc230x = { version = "0.8.0", optional = true }
 esp-alloc = { version = "0.11.0", features = ["defmt", "esp32s3"] }
 esp-backtrace = { version = "0.20.0", features = [
     "defmt",
@@ -98,6 +99,9 @@ smoltcp = { version = "0.13.0", default-features = false, features = [
 ] }
 static_cell = { version = "2.1.1", features = ["nightly"] }
 stratum-v1 = "0.1.0"
+tmp1075 = { version = "0.2.0", default-features = false, optional = true, features = [
+    "async",
+] }
 tps546 = { version = "0.1.0", optional = true }
 
 [features]
@@ -107,6 +111,8 @@ bitaxe-102 = ["asic-bm1397", "fan-emc2101", "vcore-dac"]
 bitaxe-201 = ["asic-bm1366", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
 bitaxe-202 = ["asic-bm1366", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
 bitaxe-205 = ["asic-bm1366", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
+bitaxe-302 = ["asic-bm1366", "fan-emc2302", "vcore-tps546"]
+bitaxe-303 = ["asic-bm1366", "fan-emc2302", "vcore-tps546"]
 bitaxe-207 = ["asic-bm1366", "fan-emc2101", "vcore-tps546"]
 bitaxe-400 = ["asic-bm1368", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
 bitaxe-401 = ["asic-bm1368", "asic-temp-internal", "fan-emc2101", "vcore-dac"]
@@ -116,6 +122,9 @@ bitaxe-600 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
 bitaxe-601 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
 bitaxe-602 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
 bitaxe-603 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
+bitaxe-650 = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
+bitaxe-701 = ["asic-bm1368", "fan-emc2302", "vcore-tps546"]
+bitaxe-702 = ["asic-bm1368", "fan-emc2302", "vcore-tps546"]
 bitaxe-801 = ["asic-bm1370", "fan-emc2103", "vcore-tps546"]
 bitaxe-1201 = [
     "asic-bm1372",
@@ -134,8 +143,11 @@ bitaxe-1300 = [
 # A board by its name: the latest revision of the family.
 bitaxe-max = ["bitaxe-102"]
 bitaxe-ultra = ["bitaxe-207"]
+bitaxe-hex = ["bitaxe-303"]
 bitaxe-supra = ["bitaxe-403"]
 bitaxe-gamma = ["bitaxe-603"]
+bitaxe-gamma-duo = ["bitaxe-650"]
+bitaxe-supra-hex = ["bitaxe-702"]
 bitaxe-gamma-turbo = ["bitaxe-801"]
 bitaxe-naja-duo = ["bitaxe-1201"]
 bitaxe-gamma-hex = ["bitaxe-1300"]
@@ -152,6 +164,8 @@ asic-enable = []
 asic-temp-internal = []
 fan-emc2101 = ["dep:emc2101"]
 fan-emc2103 = ["dep:emc2103"]
+# Two fans on an EMC2302, the temperature from two TMP1075 board sensors.
+fan-emc2302 = ["dep:emc230x", "dep:tmp1075"]
 # I2C on SDA GPIO44 / SCL GPIO43 (boards with the colour display) instead of GPIO47 / GPIO48.
 pins-color = []
 # TPS40305 buck moved by a DS4432 current DAC, INA260 on the input, PWR_EN.
