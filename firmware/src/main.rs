@@ -4,7 +4,7 @@
 mod asic;
 mod board;
 mod cooling;
-#[cfg(feature = "display-oled")]
+#[cfg(any(feature = "display-oled", feature = "display-st7789"))]
 mod display;
 mod io06;
 mod pool;
@@ -170,6 +170,44 @@ async fn main(spawner: Spawner) -> ! {
     // Status screen on the OLED, on the shared I2C bus
     #[cfg(feature = "display-oled")]
     spawner.spawn(display::display_task(I2cDevice::new(i2c_bus), stack).unwrap());
+
+    // Status screen on the ST7789: 8-bit i80 bus on LCD_CAM (data GPIO39 to GPIO42 and GPIO45 to
+    // GPIO48, WR GPIO8, DC GPIO7, CS GPIO6, 4 MHz), RD GPIO9 held high, reset GPIO5 (active low),
+    // panel power GPIO15 and backlight GPIO38 (active high).
+    #[cfg(feature = "display-st7789")]
+    {
+        use esp_hal::lcd_cam::{
+            lcd::i8080::{self, I8080},
+            LcdCam,
+        };
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM).into_async();
+        let i8080 = I8080::new(
+            lcd_cam.lcd,
+            peripherals.DMA_CH0,
+            i8080::Config::default().with_frequency(Rate::from_mhz(4)),
+        )
+        .unwrap()
+        .with_cs(peripherals.GPIO6)
+        .with_dc(peripherals.GPIO7)
+        .with_wrx(peripherals.GPIO8)
+        .with_data0(peripherals.GPIO39)
+        .with_data1(peripherals.GPIO40)
+        .with_data2(peripherals.GPIO41)
+        .with_data3(peripherals.GPIO42)
+        .with_data4(peripherals.GPIO45)
+        .with_data5(peripherals.GPIO46)
+        .with_data6(peripherals.GPIO47)
+        .with_data7(peripherals.GPIO48);
+        let lcd = display::Lcd::new(
+            i8080,
+            esp_hal::dma_tx_buffer!(display::ROW_BYTES).unwrap(),
+            Output::new(peripherals.GPIO5, Level::High, OutputConfig::default()),
+            Output::new(peripherals.GPIO38, Level::Low, OutputConfig::default()),
+            Output::new(peripherals.GPIO9, Level::High, OutputConfig::default()),
+            Output::new(peripherals.GPIO15, Level::High, OutputConfig::default()),
+        );
+        spawner.spawn(display::display_task(lcd, stack).unwrap());
+    }
 
     // Pool session
     spawner.spawn(

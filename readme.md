@@ -28,9 +28,10 @@ This is a proof of concept:
 - The BitaxeMax can't mine yet: the BM1397 needs midstates, which [bm13xx-rs] doesn't compute yet.
 - The WiFi credentials are compiled in, and the pool address, worker and password are constants
   at the top of `firmware/src/pool.rs`.
-- The boards with the original pins show a status screen on their SSD1306 OLED (128 × 32): hashrate,
-  ASIC temperature and power, pool shares and best difficulty, IP address. The colour display of
-  the NajaDuo and GammaHex isn't supported yet, nor a web interface or settings storage.
+- A status screen shows the hashrate, ASIC temperature and power, pool shares and best difficulty,
+  and IP address: on the SSD1306 OLED (128 × 32) of the boards with the original pins, on the
+  ST7789 colour LCD (320 × 170) of the NajaDuo and GammaHex. No web interface or settings storage
+  yet.
 
 ## Architecture
 
@@ -43,7 +44,8 @@ This is a proof of concept:
     on overheat
   - `asic.rs`: brings the chain up with [bm13xx-rs], feeds it jobs and checks the nonces
   - `pool.rs`: the Stratum v1 session
-  - `status.rs`: the status the tasks fill in, and `display.rs`: the OLED status screen
+  - `status.rs`: the status the tasks fill in, and `display.rs`: the status screen, on the OLED
+    (`display/oled.rs`) or the colour LCD over LCD_CAM and DMA (`display/lcd.rs`)
 - `miner-core/`: the hardware independent mining logic (block header, share check, job book,
   hashrate meter, core voltage, fan curve, units), tested on the host
 - drivers: [bm13xx-rs] for the ASICs, [tps546], [emc2101], [emc2103], [emc230x], [tmp1075],

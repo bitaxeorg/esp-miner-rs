@@ -131,6 +131,7 @@ bitaxe-801 = ["asic-bm1370", "display-oled", "fan-emc2103", "vcore-tps546"]
 bitaxe-1201 = [
     "asic-bm1372",
     "asic-enable",
+    "display-st7789",
     "fan-emc2103",
     "pins-color",
     "vcore-tps546",
@@ -138,6 +139,7 @@ bitaxe-1201 = [
 bitaxe-1300 = [
     "asic-bm1370",
     "asic-enable",
+    "display-st7789",
     "fan-emc2103",
     "pins-color",
     "vcore-tps546",
@@ -166,6 +168,8 @@ asic-enable = []
 asic-temp-internal = []
 # SSD1306 OLED (128 × 32) on the I2C bus.
 display-oled = ["dep:embedded-graphics", "dep:ssd1306"]
+# ST7789 colour LCD (320 × 170) on the 8-bit i80 bus of LCD_CAM (boards with the colour display).
+display-st7789 = ["dep:embedded-graphics"]
 fan-emc2101 = ["dep:emc2101"]
 fan-emc2103 = ["dep:emc2103"]
 # Two fans on an EMC2302, the temperature from two TMP1075 board sensors.

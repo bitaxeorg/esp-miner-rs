@@ -167,6 +167,12 @@ pub const EMC2103_DIODE: Option<(u8, emc2103::BetaCompensation)> = None;
 pub const EMC2103_DIODE: Option<(u8, emc2103::BetaCompensation)> =
     Some((0x17, emc2103::BetaCompensation::Auto));
 
+/// Whether the ST7789 is mounted upside down.
+#[cfg(feature = "bitaxe-1201")]
+pub const ST7789_FLIP: bool = false;
+#[cfg(feature = "bitaxe-1300")]
+pub const ST7789_FLIP: bool = true;
+
 /// TPS40305 feedback divider: RA (R14) and RB (R15).
 #[cfg(feature = "vcore-dac")]
 pub const VCORE_RA_OHM: f32 = 4990.0;

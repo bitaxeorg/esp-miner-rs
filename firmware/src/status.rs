@@ -38,7 +38,7 @@ impl Status {
 static STATUS: Mutex<CriticalSectionRawMutex, Cell<Status>> = Mutex::new(Cell::new(Status::new()));
 
 /// The current status.
-#[cfg(feature = "display-oled")]
+#[cfg(any(feature = "display-oled", feature = "display-st7789"))]
 pub fn get() -> Status {
     STATUS.lock(Cell::get)
 }
