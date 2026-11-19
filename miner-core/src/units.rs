@@ -113,6 +113,135 @@ pub fn network_difficulty(nbits: u32) -> f64 {
     difficulty
 }
 
+/// Decimals of a scaled value: 2 below 10, 1 below 100, else 0.
+fn decimals(value: f64) -> usize {
+    if value < 10.0 {
+        2
+    } else if value < 100.0 {
+        1
+    } else {
+        0
+    }
+}
+
+/// A hashrate given in GH/s, with its unit on a 1000 scale: `1.23 Th/s`, `485 Gh/s`. Zero,
+/// negative or invalid rates give `0 H/s`.
+pub fn hash_suffix(ghs: f64) -> String<16> {
+    const UNITS: [&str; 7] = [" H/s", " Kh/s", " Mh/s", " Gh/s", " Th/s", " Ph/s", " Eh/s"];
+    let mut s = String::new();
+    if !ghs.is_finite() || ghs <= 0.0 {
+        let _ = s.push_str("0 H/s");
+        return s;
+    }
+    let mut value = ghs * 1e9;
+    let mut unit = 0;
+    while value >= 1000.0 && unit < UNITS.len() - 1 {
+        value /= 1000.0;
+        unit += 1;
+    }
+    let _ = write!(s, "{:.*}{}", decimals(value), value, UNITS[unit]);
+    s
+}
+
+/// A difficulty with its suffix on a 1000 scale and 2 decimals, `1.23 M`, or the integer below
+/// 1000.
+pub fn diff_suffix(value: f64) -> String<16> {
+    const SUFFIXES: [&str; 7] = ["", " K", " M", " G", " T", " P", " E"];
+    let mut s = String::new();
+    if !value.is_finite() || value < 1000.0 {
+        let _ = write!(s, "{}", value.max(0.0) as u64);
+        return s;
+    }
+    let mut v = value;
+    let mut unit = 0;
+    while v >= 1000.0 && unit < SUFFIXES.len() - 1 {
+        v /= 1000.0;
+        unit += 1;
+    }
+    let _ = write!(s, "{:.2}{}", v, SUFFIXES[unit]);
+    s
+}
+
+/// A duration in words, the largest units first, at most `intervals` of them counted from the
+/// first non-zero one (zero units inside count): `1 day, 3 hours`. With `short`, `1d 3h`.
+pub fn date_ago(seconds: u64, intervals: usize, short: bool) -> String<48> {
+    const UNITS: [(u64, &str, &str); 7] = [
+        (31_536_000, "year", "y"),
+        (2_592_000, "month", "mo"),
+        (604_800, "week", "w"),
+        (86_400, "day", "d"),
+        (3_600, "hour", "h"),
+        (60, "minute", "m"),
+        (1, "second", "s"),
+    ];
+    let mut s = String::new();
+    let mut rest = seconds;
+    let mut used = 0;
+    for (size, long, abbreviation) in UNITS {
+        let n = rest / size;
+        rest %= size;
+        if used == 0 && n == 0 {
+            continue;
+        }
+        if used >= intervals.max(1) {
+            break;
+        }
+        used += 1;
+        if n == 0 {
+            continue;
+        }
+        let separator = match (s.is_empty(), short) {
+            (true, _) => "",
+            (false, true) => " ",
+            (false, false) => ", ",
+        };
+        let _ = if short {
+            write!(s, "{separator}{n}{abbreviation}")
+        } else {
+            let plural = if n == 1 { "" } else { "s" };
+            write!(s, "{separator}{n} {long}{plural}")
+        };
+    }
+    if s.is_empty() {
+        let _ = s.push_str(if short { "0s" } else { "0 seconds" });
+    }
+    s
+}
+
+#[cfg(test)]
+mod web_format_tests {
+    use super::*;
+
+    #[test]
+    fn hash_suffixes() {
+        assert_eq!(hash_suffix(0.0), "0 H/s");
+        assert_eq!(hash_suffix(f64::NAN), "0 H/s");
+        assert_eq!(hash_suffix(485.4), "485 Gh/s");
+        assert_eq!(hash_suffix(48.54), "48.5 Gh/s");
+        assert_eq!(hash_suffix(1234.0), "1.23 Th/s");
+        assert_eq!(hash_suffix(0.5), "500 Mh/s");
+    }
+
+    #[test]
+    fn diff_suffixes() {
+        assert_eq!(diff_suffix(999.9), "999");
+        assert_eq!(diff_suffix(1234.0), "1.23 K");
+        assert_eq!(diff_suffix(4_230_000.0), "4.23 M");
+        assert_eq!(diff_suffix(127e12), "127.00 T");
+    }
+
+    #[test]
+    fn dates_ago() {
+        assert_eq!(date_ago(0, 2, false), "0 seconds");
+        assert_eq!(date_ago(59, 2, false), "59 seconds");
+        assert_eq!(date_ago(3_723, 2, false), "1 hour, 2 minutes");
+        assert_eq!(date_ago(3_723, 3, false), "1 hour, 2 minutes, 3 seconds");
+        assert_eq!(date_ago(86_400 + 5, 2, false), "1 day");
+        assert_eq!(date_ago(97_200, 2, true), "1d 3h");
+        assert_eq!(date_ago(1_800, 1, false), "30 minutes");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
