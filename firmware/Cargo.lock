@@ -126,8 +126,9 @@ dependencies = [
 
 [[package]]
 name = "bm1366"
-version = "0.3.0"
-source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=422df6f1953d9fb95b5c4ab39d35b234c216d6de#422df6f1953d9fb95b5c4ab39d35b234c216d6de"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87646ed3be00ab02bd1a2349c1eb0ba95f1a8f0db023f0e01d243309d2b2d8fe"
 dependencies = [
  "bm13xx-asic",
  "bm13xx-protocol",
@@ -138,8 +139,9 @@ dependencies = [
 
 [[package]]
 name = "bm1397"
-version = "0.3.0"
-source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=422df6f1953d9fb95b5c4ab39d35b234c216d6de#422df6f1953d9fb95b5c4ab39d35b234c216d6de"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15ed1cdd65b3ff6e5202d4e59469242328f760cca566156088e071a5052f6609"
 dependencies = [
  "bm13xx-asic",
  "bm13xx-protocol",
@@ -150,8 +152,9 @@ dependencies = [
 
 [[package]]
 name = "bm13xx-asic"
-version = "0.3.0"
-source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=422df6f1953d9fb95b5c4ab39d35b234c216d6de#422df6f1953d9fb95b5c4ab39d35b234c216d6de"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d4d818d103d55b6a916e10425812c1ef097fcd4d4bdaf943c88ea121ab661f1"
 dependencies = [
  "bm13xx-protocol",
  "defmt 1.2.0",
@@ -161,8 +164,9 @@ dependencies = [
 
 [[package]]
 name = "bm13xx-chain"
-version = "0.3.0"
-source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=422df6f1953d9fb95b5c4ab39d35b234c216d6de#422df6f1953d9fb95b5c4ab39d35b234c216d6de"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f849335a2b6a1fcdf244ce009f286399f629cc3b2fa648217e6d21a0afc76715"
 dependencies = [
  "bm13xx-asic",
  "bm13xx-protocol",
@@ -177,8 +181,9 @@ dependencies = [
 
 [[package]]
 name = "bm13xx-protocol"
-version = "0.3.0"
-source = "git+https://github.com/GPTechinno/bm13xx-rs?rev=422df6f1953d9fb95b5c4ab39d35b234c216d6de#422df6f1953d9fb95b5c4ab39d35b234c216d6de"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31c7a311ba1fdb6b0725d8b60a8177e12ef39284e8506c8f565f52da79e8c8d3"
 dependencies = [
  "crc",
  "defmt 1.2.0",
@@ -204,7 +209,7 @@ dependencies = [
  "embedded-io 0.7.1",
  "embedded-io-async 0.7.0",
  "futures-intrusive",
- "heapless 0.8.0",
+ "heapless 0.9.3",
 ]
 
 [[package]]

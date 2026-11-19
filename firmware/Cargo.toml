@@ -11,11 +11,10 @@ keywords = ["embedded", "embedded-hal", "esp", "esp32s3", "no-std"]
 categories = ["embedded", "no-std", "bitcoin"]
 
 [dependencies]
-# bm13xx-rs is not on crates.io yet
-bm1366 = { git = "https://github.com/GPTechinno/bm13xx-rs", rev = "422df6f1953d9fb95b5c4ab39d35b234c216d6de", features = ["defmt"] }
-bm1397 = { git = "https://github.com/GPTechinno/bm13xx-rs", rev = "422df6f1953d9fb95b5c4ab39d35b234c216d6de", features = ["defmt"] }
-bm13xx-chain = { git = "https://github.com/GPTechinno/bm13xx-rs", rev = "422df6f1953d9fb95b5c4ab39d35b234c216d6de", features = ["defmt"] }
-bm13xx-protocol = { git = "https://github.com/GPTechinno/bm13xx-rs", rev = "422df6f1953d9fb95b5c4ab39d35b234c216d6de", features = ["defmt"] }
+bm1366 = { version = "0.4.0", features = ["defmt"] }
+bm1397 = { version = "0.4.0", features = ["defmt"] }
+bm13xx-chain = { version = "0.4.0", features = ["defmt"] }
+bm13xx-protocol = { version = "0.4.0", features = ["defmt"] }
 bounded-integer = "0.6"
 defmt = "1.2.0"
 defmt-rtt = "1.3.1"
