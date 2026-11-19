@@ -18,13 +18,15 @@ const BOARD_FEATURES: usize = cfg!(feature = "bitaxe-102") as usize
     + cfg!(feature = "bitaxe-602") as usize
     + cfg!(feature = "bitaxe-603") as usize
     + cfg!(feature = "bitaxe-801") as usize
-    + cfg!(feature = "bitaxe-1201") as usize;
+    + cfg!(feature = "bitaxe-1201") as usize
+    + cfg!(feature = "bitaxe-1300") as usize;
 const _: () = assert!(
     BOARD_FEATURES == 1,
     "You must activate exactly one board feature: a board number (bitaxe-102, bitaxe-201, \
      bitaxe-202, bitaxe-205, bitaxe-207, bitaxe-400, bitaxe-401, bitaxe-402, bitaxe-403, \
-     bitaxe-600, bitaxe-601, bitaxe-602, bitaxe-603, bitaxe-801, bitaxe-1201) or a family name \
-     (bitaxe-max, bitaxe-ultra, bitaxe-supra, bitaxe-gamma, bitaxe-gamma-turbo, bitaxe-naja-duo)"
+     bitaxe-600, bitaxe-601, bitaxe-602, bitaxe-603, bitaxe-801, bitaxe-1201, bitaxe-1300) or a family \
+     name (bitaxe-max, bitaxe-ultra, bitaxe-supra, bitaxe-gamma, bitaxe-gamma-turbo, \
+     bitaxe-naja-duo, bitaxe-gamma-hex)"
 );
 
 /// ASIC driver.
@@ -46,15 +48,17 @@ pub const VCORE: f32 = 1.4;
 pub const VCORE: f32 = 1.2;
 #[cfg(feature = "asic-bm1368")]
 pub const VCORE: f32 = 1.166;
-#[cfg(feature = "asic-bm1370")]
+#[cfg(all(feature = "asic-bm1370", not(feature = "bitaxe-1300")))]
 pub const VCORE: f32 = 1.15;
+#[cfg(feature = "bitaxe-1300")]
+pub const VCORE: f32 = 1.2;
 #[cfg(feature = "asic-bm1372")]
 pub const VCORE: f32 = 1.0;
 
 /// Voltage domains in series on the core supply, each holding the same number of chips.
-#[cfg(feature = "bitaxe-1201")]
+#[cfg(any(feature = "bitaxe-1201", feature = "bitaxe-1300"))]
 pub const VOLTAGE_DOMAINS: usize = 2;
-#[cfg(not(feature = "bitaxe-1201"))]
+#[cfg(not(any(feature = "bitaxe-1201", feature = "bitaxe-1300")))]
 pub const VOLTAGE_DOMAINS: usize = 1;
 
 /// Hash frequency (MHz).
@@ -64,8 +68,10 @@ pub const HASH_FREQ_MHZ: u64 = 425;
 pub const HASH_FREQ_MHZ: u64 = 485;
 #[cfg(feature = "asic-bm1368")]
 pub const HASH_FREQ_MHZ: u64 = 490;
-#[cfg(feature = "asic-bm1370")]
+#[cfg(all(feature = "asic-bm1370", not(feature = "bitaxe-1300")))]
 pub const HASH_FREQ_MHZ: u64 = 525;
+#[cfg(feature = "bitaxe-1300")]
+pub const HASH_FREQ_MHZ: u64 = 690;
 #[cfg(feature = "asic-bm1372")]
 pub const HASH_FREQ_MHZ: u64 = 327;
 
@@ -110,15 +116,16 @@ pub const EMC2101_DIODE: Option<(u8, u8)> = Some((0x24, 0x00));
 ))]
 pub const EMC2101_DIODE: Option<(u8, u8)> = None;
 
-/// Whether External Diode 1 of the EMC2103 is on the second chip of the chain instead of the first.
-#[cfg(feature = "bitaxe-801")]
-pub const EMC2103_TEMP_FLIP: bool = true;
-#[cfg(feature = "bitaxe-1201")]
-pub const EMC2103_TEMP_FLIP: bool = false;
+/// Whether the EMC2103 PWM output is push-pull at 26 kHz, instead of open drain at the default
+/// base frequency.
+#[cfg(feature = "bitaxe-1300")]
+pub const EMC2103_PUSH_PULL_26KHZ: bool = true;
+#[cfg(all(feature = "fan-emc2103", not(feature = "bitaxe-1300")))]
+pub const EMC2103_PUSH_PULL_26KHZ: bool = false;
 
 /// EMC2103 settings for the chips' diodes, on both external channels: ideality factor register
 /// value and beta compensation. `None` keeps the device defaults.
-#[cfg(feature = "bitaxe-801")]
+#[cfg(any(feature = "bitaxe-801", feature = "bitaxe-1300"))]
 pub const EMC2103_DIODE: Option<(u8, emc2103::BetaCompensation)> = None;
 #[cfg(feature = "bitaxe-1201")]
 pub const EMC2103_DIODE: Option<(u8, emc2103::BetaCompensation)> =
@@ -143,7 +150,11 @@ pub const DS4432_RFS0_OHM: u32 = 80_600;
 /// TPS546 settings for the 5 V input, single phase.
 #[cfg(all(
     feature = "vcore-tps546",
-    not(any(feature = "bitaxe-801", feature = "bitaxe-1201"))
+    not(any(
+        feature = "bitaxe-801",
+        feature = "bitaxe-1201",
+        feature = "bitaxe-1300"
+    ))
 ))]
 pub const TPS546: crate::vcore::Tps546Config = crate::vcore::Tps546Config {
     phase: 0x00,
@@ -194,6 +205,24 @@ pub const TPS546: crate::vcore::Tps546Config = crate::vcore::Tps546Config {
     vout_max: 3.0,
     iout_oc_warn: 61.0,
     iout_oc_fault: 68.0,
+};
+
+/// TPS546 settings for the 12 V input, four phases with SYNC auto-detected, for two voltage domains.
+#[cfg(feature = "bitaxe-1300")]
+pub const TPS546: crate::vcore::Tps546Config = crate::vcore::Tps546Config {
+    phase: 0xFF,
+    stack: crate::vcore::PhaseCount::FourPhase,
+    sync: 0xD0,
+    compensation: Some([0x02, 0x64, 0x82, 0x11, 0x06]),
+    vin_on: 11.0,
+    vin_off: 10.5,
+    vin_uv_warn: Some(11.0),
+    vin_ov_fault: 14.0,
+    vout_scale_loop: 0.125,
+    vout_min: 2.0,
+    vout_max: 3.0,
+    iout_oc_warn: 150.0,
+    iout_oc_fault: 160.0,
 };
 
 /// ASIC difficulty (ticket mask): chips only report nonces at least this difficult.

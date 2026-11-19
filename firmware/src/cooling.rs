@@ -2,7 +2,7 @@
 //!
 //! - `fan-emc2101`: one ASIC, whose temperature is the EMC2101 internal sensor plus an offset
 //!   (`asic-temp-internal`) or the chip's diode on the external channel.
-//! - `fan-emc2103`: one ASIC on each external diode channel, with the ideality and beta of
+//! - `fan-emc2103`: a chip diode on each external channel, with the ideality and beta of
 //!   `board::EMC2103_DIODE` when set, the fan driven by direct setting.
 
 #[cfg(feature = "fan-emc2101")]
@@ -95,7 +95,7 @@ mod emc2101_fan {
 mod emc2103_fan {
     use bounded_integer::BoundedU8;
     use defmt::{debug, error, info};
-    use emc2103::{AsyncEMC2103, BetaCompensation, Channel, ExternalDiode};
+    use emc2103::{AsyncEMC2103, BetaCompensation, Channel, ExternalDiode, PwmBase};
 
     use crate::{board, power::BusDevice};
 
@@ -108,11 +108,21 @@ mod emc2103_fan {
             Self { sensor }
         }
 
-        /// Sets up the fan output (open drain, normal polarity, direct setting) at full speed and
-        /// the temperature channels.
+        /// Sets up the fan output (normal polarity, direct setting; open drain at the default base
+        /// frequency, or push-pull at 26 kHz) at full speed and the temperature channels.
         pub async fn init(&mut self) {
-            if let Err(e) = self.sensor.set_pwm_output(false, false).await {
+            let push_pull = board::EMC2103_PUSH_PULL_26KHZ;
+            if let Err(e) = self.sensor.set_pwm_output(push_pull, false).await {
                 error!("fan PWM setup failed: {}", e);
+            }
+            if push_pull {
+                if let Err(e) = self
+                    .sensor
+                    .set_pwm_frequency(PwmBase::Base26kHz, BoundedU8::MIN)
+                    .await
+                {
+                    error!("fan PWM frequency setup failed: {}", e);
+                }
             }
             if let Err(e) = self.sensor.disable_lut().await {
                 error!("disabling the fan Look-Up Table failed: {}", e);
@@ -126,17 +136,15 @@ mod emc2103_fan {
             }
         }
 
-        /// Temperature of the hottest ASIC (°C), NaN when one can't be read.
+        /// Temperature of the hotter of the two chips with a diode (°C), NaN when one can't be
+        /// read.
         pub async fn asic_temp(&mut self) -> f32 {
-            // External Diode 1 is on the first chip of the chain, or the second one when flipped.
-            let (first, second) = if board::EMC2103_TEMP_FLIP {
-                (Channel::External2, Channel::External1)
-            } else {
-                (Channel::External1, Channel::External2)
-            };
-            let first = self.chip_temp(first).await;
-            let second = self.chip_temp(second).await;
-            debug!("ASIC 0 {} °C, ASIC 1 {} °C", first, second);
+            let first = self.chip_temp(Channel::External1).await;
+            let second = self.chip_temp(Channel::External2).await;
+            debug!(
+                "ASIC diodes: External1 {} °C, External2 {} °C",
+                first, second
+            );
             if first.is_nan() || second.is_nan() {
                 f32::NAN
             } else {

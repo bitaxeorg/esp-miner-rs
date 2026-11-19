@@ -124,6 +124,13 @@ bitaxe-1201 = [
     "pins-color",
     "vcore-tps546",
 ]
+bitaxe-1300 = [
+    "asic-bm1370",
+    "asic-enable",
+    "fan-emc2103",
+    "pins-color",
+    "vcore-tps546",
+]
 # A board by its name: the latest revision of the family.
 bitaxe-max = ["bitaxe-102"]
 bitaxe-ultra = ["bitaxe-207"]
@@ -131,6 +138,7 @@ bitaxe-supra = ["bitaxe-403"]
 bitaxe-gamma = ["bitaxe-603"]
 bitaxe-gamma-turbo = ["bitaxe-801"]
 bitaxe-naja-duo = ["bitaxe-1201"]
+bitaxe-gamma-hex = ["bitaxe-1300"]
 # Board parts, enabled by the board features above, not meant to be selected directly.
 asic-bm1366 = ["dep:bm1366"]
 asic-bm1368 = ["dep:bm1368"]
