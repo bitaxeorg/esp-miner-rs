@@ -42,7 +42,7 @@ embedded-io-async = "0.7.0"
 # stratum-v1 0.1 still uses the embedded-io 0.6 traits, see src/io06.rs
 embedded-io-06 = { package = "embedded-io", version = "0.6.1" }
 embedded-io-async-06 = { package = "embedded-io-async", version = "0.6.1" }
-emc2101 = { version = "4.0.0", default-features = false, features = [
+emc2101 = { version = "4.2.0", default-features = false, features = [
     "async",
     "defmt",
 ] }

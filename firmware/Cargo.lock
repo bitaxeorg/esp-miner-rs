@@ -935,9 +935,9 @@ dependencies = [
 
 [[package]]
 name = "emc2101"
-version = "4.0.0"
+version = "4.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7997377a125ec572d3753b5e6567bc7756a5e3e273c60b6683eac0112527d1db"
+checksum = "3458c8acecb5ed49773c079909e25055ac6bbb5a7212c313e01b6ea982e1a79e"
 dependencies = [
  "bounded-integer",
  "defmt 1.2.0",
