@@ -21,7 +21,7 @@ use miner_core::{
 };
 use stratum_v1::{Client, Extensions, Message, Share, VersionRolling};
 
-use crate::{board, settings, status, wlog};
+use crate::{board, net, settings, status, wlog};
 
 /// Jobs rolled from the pool work, ready for the chips.
 pub static JOBS: Channel<CriticalSectionRawMutex, MiningJob, 2> = Channel::new();
@@ -133,8 +133,9 @@ pub async fn pool_task(
     tx_buf: &'static mut [u8; 1536],
 ) {
     let mut failures = 0;
+    let mut station = net::station_address();
     loop {
-        stack.wait_config_up().await;
+        net::station_up(&mut station).await;
         RECONNECT.reset();
         let Some((pool, fallback)) = choose_pool(failures) else {
             wlog!(Error, "pool", "no pool configured");

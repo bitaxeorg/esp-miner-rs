@@ -22,7 +22,6 @@ mod vcore;
 mod web;
 mod weblog;
 
-use defmt::info;
 use defmt_rtt as _;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
@@ -275,11 +274,6 @@ async fn main(spawner: Spawner) -> ! {
         )
         .unwrap(),
     );
-
-    stack.wait_config_up().await;
-    if let Some(config) = stack.config_v4() {
-        info!("Got IP: {}", config.address);
-    }
 
     loop {
         Timer::after(Duration::from_secs(60)).await;

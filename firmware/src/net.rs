@@ -11,10 +11,11 @@ use defmt::{debug, warn};
 use edge_nal::UdpSplit;
 use edge_nal_embassy::{Udp, UdpBuffers};
 use embassy_futures::select::{select, select3, Either, Either3};
-use embassy_net::Stack;
+use embassy_net::{Ipv4Cidr, Stack};
 use embassy_sync::{
     blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex},
     signal::Signal,
+    watch::{Receiver, Watch},
 };
 use embassy_time::{with_timeout, Duration, Instant, Timer};
 use esp_radio::wifi::{
@@ -44,6 +45,37 @@ static SCAN_REQUEST: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 static SCAN_RESULT: Signal<CriticalSectionRawMutex, Option<Vec<Network, SCAN_MAX>>> = Signal::new();
 /// Signaled when the station gets an address: the access point goes off.
 static STATION_UP: Signal<CriticalSectionRawMutex, ()> = Signal::new();
+/// Tasks waiting on [`STATION_ADDRESS`].
+const STATION_WAITERS: usize = 2;
+/// The station's address, `None` without one. A stack keeps one waker for its configuration, so
+/// tasks waiting on it together wake each other in a loop: only [`address_task`] waits on the
+/// station stack, and the other tasks wait on this.
+static STATION_ADDRESS: Watch<CriticalSectionRawMutex, Option<Ipv4Cidr>, STATION_WAITERS> =
+    Watch::new_with(None);
+
+/// A task's view of the station's address.
+pub type StationAddress =
+    Receiver<'static, CriticalSectionRawMutex, Option<Ipv4Cidr>, STATION_WAITERS>;
+
+/// A view of the station's address, for one waiting task.
+pub fn station_address() -> StationAddress {
+    STATION_ADDRESS.receiver().unwrap()
+}
+
+/// Waits for the station to have an address, and returns it.
+pub async fn station_up(station: &mut StationAddress) -> Ipv4Cidr {
+    loop {
+        if let Some(address) = station.get().await {
+            return address;
+        }
+        station.changed().await;
+    }
+}
+
+/// Waits for the station to lose its address.
+pub async fn station_down(station: &mut StationAddress) {
+    station.get_and(Option::is_none).await;
+}
 /// Signaled by a long press of the button: the access point goes on or off.
 pub static TOGGLE_AP: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
@@ -154,6 +186,7 @@ fn set_ap(controller: &mut WifiController<'static>, on: bool) {
 /// Follows the station's address.
 #[embassy_executor::task]
 pub async fn address_task(stack: Stack<'static>) {
+    let station = STATION_ADDRESS.sender();
     loop {
         stack.wait_config_up().await;
         let address = stack.config_v4().map(|c| c.address);
@@ -161,9 +194,11 @@ pub async fn address_task(stack: Stack<'static>) {
             wlog!(Info, "wifi", "address {}", a);
         }
         status::update(|s| s.ipv4 = address);
+        station.send(address);
         STATION_UP.signal(());
         stack.wait_config_down().await;
         status::update(|s| s.ipv4 = None);
+        station.send(None);
     }
 }
 
@@ -315,11 +350,9 @@ pub async fn captive_dns_task(stack: Stack<'static>) {
 pub async fn mdns_task(stack: Stack<'static>, rng: esp_hal::rng::Rng) {
     let buffers: UdpBuffers<1, 768, 768, 2> = UdpBuffers::new();
     let udp = Udp::new(stack, &buffers);
+    let mut station = station_address();
     loop {
-        stack.wait_config_up().await;
-        let Some(ip) = stack.config_v4().map(|c| c.address.address()) else {
-            continue;
-        };
+        let ip = station_up(&mut station).await.address();
         let hostname = settings::with(|s| s.hostname.clone());
         let socket = edge_mdns::io::bind(
             &udp,
@@ -359,7 +392,7 @@ pub async fn mdns_task(stack: Stack<'static>, rng: esp_hal::rng::Rng) {
         wlog!(Info, "mdns", "answering {}.local", hostname.as_str());
         if let Either::First(Err(e)) = select(
             mdns.run(edge_mdns::HostAnswersMdnsHandler::new(&host)),
-            stack.wait_config_down(),
+            station_down(&mut station),
         )
         .await
         {
