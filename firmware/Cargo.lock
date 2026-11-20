@@ -237,9 +237,9 @@ dependencies = [
 
 [[package]]
 name = "bm13xx-chain"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f849335a2b6a1fcdf244ce009f286399f629cc3b2fa648217e6d21a0afc76715"
+checksum = "3b45ee417aae1483289c92a082f4d2eea280ed6f0d3468fdbb44a760bde3b314"
 dependencies = [
  "bm13xx-asic",
  "bm13xx-protocol",
@@ -1374,6 +1374,7 @@ dependencies = [
  "bm1370",
  "bm1372",
  "bm1397",
+ "bm13xx-asic",
  "bm13xx-chain",
  "bm13xx-protocol",
  "bounded-integer",

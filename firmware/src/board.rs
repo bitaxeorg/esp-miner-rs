@@ -106,6 +106,10 @@ pub const HW_VERSION_ROLLING: bool = false;
 #[cfg(not(feature = "asic-bm1397"))]
 pub const HW_VERSION_ROLLING: bool = true;
 
+/// Whether the chips count their hashes (`GotNonceCounter`, one count per 2^32 hashes). The BM1397
+/// has no such counter.
+pub const HASH_COUNTERS: bool = cfg!(not(feature = "asic-bm1397"));
+
 /// Versions rolled per job: 4 midstates on the BM1397, 16 version bits on the others.
 #[cfg(feature = "asic-bm1397")]
 pub const ROLLED_VERSIONS: f32 = 4.0;

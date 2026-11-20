@@ -1,4 +1,4 @@
-//! Hashrate measured from the nonces the chips return.
+//! Hashrate measured from the nonces the chips return, or from their hash counters.
 
 /// Hashes behind one nonce at difficulty 1, on average.
 const HASHES_PER_DIFFICULTY: f64 = 4_294_967_296.0;
@@ -32,8 +32,13 @@ impl<const N: usize> HashrateMeter<N> {
 
     /// Counts a nonce returned at `now_ms`.
     pub fn record(&mut self, now_ms: u64) {
+        self.record_n(now_ms, 1);
+    }
+
+    /// Counts `n` nonces returned at `now_ms`.
+    pub fn record_n(&mut self, now_ms: u64, n: u32) {
         self.advance(now_ms);
-        self.counts[self.current] = self.counts[self.current].saturating_add(1);
+        self.counts[self.current] = self.counts[self.current].saturating_add(n);
     }
 
     /// Hashrate (GH/s) at `now_ms` of chips returning nonces at `difficulty`.
@@ -60,9 +65,55 @@ impl<const N: usize> HashrateMeter<N> {
     }
 }
 
+/// The last reading of each chip's hash counter, which counts one per 2^32 hashes (a nonce at
+/// difficulty 1) and wraps around.
+pub struct HashCounters<const N: usize> {
+    last: [Option<u32>; N],
+}
+
+impl<const N: usize> Default for HashCounters<N> {
+    fn default() -> Self {
+        Self { last: [None; N] }
+    }
+}
+
+impl<const N: usize> HashCounters<N> {
+    /// Counts since the previous reading of chip `chip`'s counter (0 for its first reading, or
+    /// for a chip beyond `N`).
+    pub fn delta(&mut self, chip: usize, value: u32) -> u32 {
+        let Some(last) = self.last.get_mut(chip) else {
+            return 0;
+        };
+        let delta = last.map_or(0, |previous| value.wrapping_sub(previous));
+        *last = Some(value);
+        delta
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn counter_deltas_wrap_around() {
+        let mut counters = HashCounters::<2>::default();
+        assert_eq!(counters.delta(0, 100), 0);
+        assert_eq!(counters.delta(0, 350), 250);
+        assert_eq!(counters.delta(1, 0xFFFF_FFF0), 0);
+        assert_eq!(counters.delta(1, 0x10), 0x20);
+        assert_eq!(counters.delta(2, 5), 0);
+    }
+
+    #[test]
+    fn counted_hashes_give_the_hashrate() {
+        // 525 MHz × 2040 small cores = 1071 GH/s: 249.4 counts per second, 1247 every 5 s
+        let mut meter = HashrateMeter::<6>::new(0, 10_000);
+        for t in 0..12 {
+            meter.record_n(t * 5_000, 1_247);
+        }
+        // 12 × 1247 counts × 2^32 hashes in the 59.999 s since the start
+        assert_close(meter.ghs(60_000 - 1, 1), 1_071.18);
+    }
 
     fn assert_close(actual: f64, expected: f64) {
         assert!((actual - expected).abs() < 0.01, "{actual} != {expected}");

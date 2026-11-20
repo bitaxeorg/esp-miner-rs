@@ -2,6 +2,7 @@
 
 use core::{cell::Cell, convert::Infallible, fmt::Write};
 
+use bm13xx_asic::register::GotNonceCounter;
 use bm13xx_chain::{Baud, Chain};
 use bm13xx_protocol::response::ResponseType;
 use defmt::{debug, error, info, warn};
@@ -14,7 +15,7 @@ use esp_hal::{
 use fugit::HertzU64;
 use heapless::String;
 use miner_core::{
-    hashrate::HashrateMeter,
+    hashrate::{HashCounters, HashrateMeter},
     job::{JobBook, MiningJob},
     scoreboard::Entry,
     share::check_nonce,
@@ -45,6 +46,8 @@ const BUCKET_1MIN_MS: u64 = 60_000;
 const HASHES_PER_DIFFICULTY: f64 = 4_294_967_296.0;
 /// How often to publish the hashrate.
 const STATUS_PERIOD: Duration = Duration::from_secs(1);
+/// How often to read the hash counters of the chips.
+const COUNTER_PERIOD: Duration = Duration::from_secs(5);
 
 type UartError = <Uart<'static, Async> as embedded_io::ErrorType>::Error;
 type ChainError = bm13xx_chain::Error<UartError, Infallible, Infallible>;
@@ -189,6 +192,12 @@ async fn run_chain(uart: &mut AsicUart, reset: &mut Output<'static>) -> Result<(
     let mut meter_10m = HashrateMeter::<60>::new(now, BUCKET_10S_MS);
     let mut meter_1h = HashrateMeter::<60>::new(now, BUCKET_1MIN_MS);
     let mut invalid_10m = HashrateMeter::<60>::new(now, BUCKET_10S_MS);
+    // Hashes the chips count, in nonces at difficulty 1.
+    let mut counters = HashCounters::<{ board::ASIC_COUNT as usize }>::default();
+    let mut counted_1m = HashrateMeter::<6>::new(now, BUCKET_10S_MS);
+    let mut counted_10m = HashrateMeter::<60>::new(now, BUCKET_10S_MS);
+    let mut counted_1h = HashrateMeter::<60>::new(now, BUCKET_1MIN_MS);
+    let mut next_counters = Instant::now();
     let mut next_status = Instant::now();
     loop {
         if !power::mining() || RESTART_CHAIN.signaled() {
@@ -215,17 +224,35 @@ async fn run_chain(uart: &mut AsicUart, reset: &mut Output<'static>) -> Result<(
                 None => {}
             }
         }
+        if board::HASH_COUNTERS && Instant::now() >= next_counters {
+            let mut counts = 0u32;
+            for i in 0..chain.asic_cnt {
+                if let Some(value) = chain.read_register(i, GotNonceCounter::ADDR).await? {
+                    counts = counts.saturating_add(counters.delta(i, value));
+                }
+            }
+            let now = Instant::now().as_millis();
+            counted_1m.record_n(now, counts);
+            counted_10m.record_n(now, counts);
+            counted_1h.record_n(now, counts);
+            next_counters = Instant::now() + COUNTER_PERIOD;
+        }
         if Instant::now() >= next_status {
             let now = Instant::now().as_millis();
             let d = board::ASIC_DIFFICULTY;
-            let (h1, h10, h60) = (
-                meter_1m.ghs(now, d),
-                meter_10m.ghs(now, d),
-                meter_1h.ghs(now, d),
-            );
+            let nonce_10m = meter_10m.ghs(now, d);
+            let (h1, h10, h60) = if board::HASH_COUNTERS {
+                (
+                    counted_1m.ghs(now, 1),
+                    counted_10m.ghs(now, 1),
+                    counted_1h.ghs(now, 1),
+                )
+            } else {
+                (meter_1m.ghs(now, d), nonce_10m, meter_1h.ghs(now, d))
+            };
             let invalid = invalid_10m.ghs(now, d);
-            let errors = if h10 + invalid > 0.0 {
-                invalid / (h10 + invalid) * 100.0
+            let errors = if nonce_10m + invalid > 0.0 {
+                invalid / (nonce_10m + invalid) * 100.0
             } else {
                 0.0
             };
