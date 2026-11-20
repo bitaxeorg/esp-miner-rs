@@ -131,12 +131,14 @@ pub async fn display_task(mut bus: BusDevice, stack: Stack<'static>, button: Inp
         info!("no OLED display found");
         return;
     };
-    // 180° turns the display over; 90° and 270° don't fit its shape
+    // 180° turns the display over; 90° and 270° don't fit its shape. The panel is
+    // mounted upside down for the driver: its Rotate180 (no segment remap, normal
+    // COM scan) is the upright image.
     let (rotation, invert) = crate::settings::with(|s| (s.rotation, s.invert_screen));
     let rotation = if rotation == 180 || rotation == 270 {
-        DisplayRotation::Rotate180
-    } else {
         DisplayRotation::Rotate0
+    } else {
+        DisplayRotation::Rotate180
     };
     let mut display =
         Ssd1306Async::new(interface, DisplaySize128x32, rotation).into_buffered_graphics_mode();
