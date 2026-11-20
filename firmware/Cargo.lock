@@ -734,9 +734,9 @@ dependencies = [
 
 [[package]]
 name = "ds4432"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7c9edb5eab00edcae9ad1137542ad2ab583881d88848b4169f4eb861c564f94"
+checksum = "2318c5ece5512df5b46d9c66532cbbb0726e69d9baa047ebfd317a4da60f8d28"
 dependencies = [
  "defmt 1.2.0",
  "embedded-hal-async",
