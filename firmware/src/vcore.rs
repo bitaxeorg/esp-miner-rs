@@ -308,7 +308,11 @@ mod pmbus {
             Timer::after(ID_FIRST_DELAY).await;
             for _ in 0..ID_ATTEMPTS {
                 if let Ok(id) = self.tps.get_ic_device_id().await {
-                    if DEVICE_IDS.iter().any(|known| id.as_slice() == known) {
+                    // The block starts with its byte count.
+                    if DEVICE_IDS
+                        .iter()
+                        .any(|known| id.get(1..) == Some(&known[..]))
+                    {
                         return true;
                     }
                 }
