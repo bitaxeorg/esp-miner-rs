@@ -20,7 +20,7 @@ use embassy_sync::{
 use embassy_time::{with_timeout, Duration, Instant, Timer};
 use esp_radio::wifi::{
     ap::AccessPointConfig, scan::ScanConfig, sta::StationConfig, AuthenticationMethodConfig,
-    Config, WifiController,
+    Config, ConnectionError, WifiController,
 };
 use heapless::{String, Vec};
 
@@ -131,10 +131,16 @@ pub async fn scan() -> Option<Vec<Network, SCAN_MAX>> {
 }
 
 async fn do_scan(controller: &mut WifiController<'static>) -> Option<Vec<Network, SCAN_MAX>> {
-    let found = controller
+    let found = match controller
         .scan_async(&ScanConfig::default().with_max(SCAN_MAX))
         .await
-        .ok()?;
+    {
+        Ok(found) => found,
+        Err(e) => {
+            warn!("wifi scan failed: {}", e);
+            return None;
+        }
+    };
     let mut networks = Vec::new();
     for ap in found.iter().filter(|ap| !ap.ssid.is_empty()) {
         let mut ssid = String::new();
@@ -233,7 +239,9 @@ pub async fn connection_task(mut controller: WifiController<'static>, configured
                 retries = 0;
                 set_wifi_status("Connected!");
                 wlog!(Info, "wifi", "connected");
-                loop {
+                // Switching the access point changes the Wi-Fi mode, which restarts the radio:
+                // the station connects again, and that is not a disconnection.
+                let switched = loop {
                     match select3(
                         controller.wait_for_disconnect_async(),
                         SCAN_REQUEST.wait(),
@@ -241,7 +249,7 @@ pub async fn connection_task(mut controller: WifiController<'static>, configured
                     )
                     .await
                     {
-                        Either3::First(_) => break,
+                        Either3::First(_) => break false,
                         Either3::Second(()) => {
                             let result = do_scan(&mut controller).await;
                             SCAN_RESULT.signal(result);
@@ -250,29 +258,45 @@ pub async fn connection_task(mut controller: WifiController<'static>, configured
                             if ap {
                                 ap = false;
                                 set_ap(&mut controller, false);
+                                break true;
                             }
                         }
                         Either3::Third(Either::Second(())) => {
                             ap = !ap;
                             set_ap(&mut controller, ap);
+                            break true;
                         }
                     }
-                }
-                wlog!(Warn, "wifi", "disconnected");
-                if !ap {
-                    ap = true;
-                    set_ap(&mut controller, true);
+                };
+                if !switched {
+                    wlog!(Warn, "wifi", "disconnected");
+                    if !ap {
+                        ap = true;
+                        set_ap(&mut controller, true);
+                    }
                 }
             }
             Either3::First(Err(e)) => {
                 retries += 1;
+                // the reason only: the whole error does not fit the status
                 let mut text = String::<48>::new();
-                let _ = write!(text, "{:?} (retry #{})", defmt::Debug2Format(&e), retries);
+                let _ = match e {
+                    ConnectionError::Failed(info) => {
+                        write!(text, "{:?} (retry #{})", info.reason, retries)
+                    }
+                    e => write!(text, "{:?} (retry #{})", e, retries),
+                };
                 debug!("wifi connection failed: {}", text.as_str());
                 set_wifi_status(&text);
-                Timer::after(RETRY_DELAY).await;
+                if let Either::Second(()) =
+                    select(Timer::after(RETRY_DELAY), SCAN_REQUEST.wait()).await
+                {
+                    SCAN_RESULT.signal(do_scan(&mut controller).await);
+                }
             }
             Either3::Second(()) => {
+                // the driver does not scan while it connects
+                let _ = controller.disconnect_async().await;
                 let result = do_scan(&mut controller).await;
                 SCAN_RESULT.signal(result);
             }
