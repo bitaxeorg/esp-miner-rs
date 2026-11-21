@@ -97,6 +97,9 @@ jobs:
             args: --features=bitaxe-205 --workspace -- -D warnings
           - command: clippy
             args: --features=bitaxe-401 --workspace -- -D warnings
+          # an ESP32-S3 module alone
+          - command: clippy
+            args: --features=devkit --workspace -- -D warnings
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
