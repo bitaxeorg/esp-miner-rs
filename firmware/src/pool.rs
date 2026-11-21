@@ -15,11 +15,13 @@ use embassy_sync::{
     signal::Signal,
 };
 use embassy_time::{Duration, Instant, Timer};
+use heapless::Vec;
 use heapless::{Deque, String};
 use miner_core::{
-    coinbase::coinbase_info, job::MiningJob, pool_config::PoolConfig, units::network_difficulty,
+    coinbase::coinbase_info, job::MiningJob, pool_config::PoolConfig, share::Share,
+    units::network_difficulty,
 };
-use stratum_v1::{Client, Extensions, Message, Share, VersionRolling};
+use stratum_v1::{Client, Extensions, Message, VersionRolling};
 
 use crate::{board, net, settings, status, wlog};
 
@@ -258,7 +260,15 @@ async fn session(
         if *authorized {
             while let Ok(share) = SHARES.try_receive() {
                 busy = true;
-                client.send_submit(share).await?;
+                client
+                    .send_submit(stratum_v1::Share {
+                        job_id: String::try_from(share.job_id.as_str()).unwrap_or_default(),
+                        extranonce2: Vec::from_slice(&share.extranonce2).unwrap_or_default(),
+                        ntime: share.ntime,
+                        nonce: share.nonce,
+                        version_bits: share.version_bits,
+                    })
+                    .await?;
                 if submitted.is_full() {
                     submitted.pop_front();
                 }
@@ -271,7 +281,7 @@ async fn session(
                         busy = true;
                         let _ = JOBS.try_send(MiningJob::from_stratum_v1(
                             job.job_id,
-                            job.extranonce2,
+                            &job.extranonce2,
                             job.header.version,
                             job.header.prev_blockhash,
                             job.header.merkle_root,

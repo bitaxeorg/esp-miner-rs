@@ -1,6 +1,27 @@
 //! Checking the nonces returned by the chips.
 
-use crate::{header::difficulty, job::MiningJob};
+use heapless::{String, Vec};
+
+use crate::{
+    header::difficulty,
+    job::{MiningJob, EXTRANONCE_LEN_MAX},
+};
+
+/// A share for the pool, whichever its protocol.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Share {
+    /// The job's [`MiningJob::pool_job_id`].
+    pub job_id: String<32>,
+    /// The job's [`MiningJob::extranonce2`].
+    pub extranonce2: Vec<u8, EXTRANONCE_LEN_MAX>,
+    pub ntime: u32,
+    pub nonce: u32,
+    /// Version of the hashed header (Stratum V2 submits it whole).
+    pub version: u32,
+    /// `version_bits` of `mining.submit` (BIP 310), `None` without version rolling.
+    pub version_bits: Option<u32>,
+}
 
 /// The version a chip hashed: the job version with the rolled bits in `mask` (BIP 310).
 pub fn rolled_version(job_version: u32, version_bits: u32, mask: u32) -> u32 {

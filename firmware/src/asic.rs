@@ -17,10 +17,9 @@ use miner_core::{
     hashrate::{HashCounters, HashrateMeter},
     job::{JobBook, MiningJob},
     scoreboard::Entry,
-    share::check_nonce,
+    share::{check_nonce, Share},
     timing::job_interval_ms,
 };
-use stratum_v1::Share;
 
 use crate::{
     board,
@@ -374,10 +373,11 @@ fn handle_response(book: &JobBook<JOB_IDS>, resp: ResponseType) -> Option<Result
     );
     if checked.difficulty >= pool_difficulty {
         let share = Share {
-            job_id: String::try_from(job.pool_job_id.as_str()).unwrap(),
+            job_id: job.pool_job_id.clone(),
             extranonce2: job.extranonce2.clone(),
             ntime: job.ntime,
             nonce,
+            version: checked.version,
             version_bits: checked.version_bits,
         };
         if SHARES.try_send(share).is_err() {

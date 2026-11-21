@@ -4,16 +4,21 @@ use heapless::{String, Vec};
 
 use crate::header::{reversed, BlockHeader};
 
+/// Longest extranonce a job carries: the extranonce2 of Stratum V1, or the miner's part of the
+/// extranonce of a Stratum V2 extended channel.
+pub const EXTRANONCE_LEN_MAX: usize = 32;
+
 /// A job ready to be sent to the chips.
 ///
 /// Hashes are kept in internal byte order (as serialized in a block header).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct MiningJob {
-    /// Pool job id, echoed back in `mining.submit`.
+    /// Pool job id, echoed back in `mining.submit` (Stratum V2: the job id in decimal).
     pub pool_job_id: String<32>,
-    /// Extranonce2 the coinbase of this job was built with, echoed back in `mining.submit`.
-    pub extranonce2: Vec<u8, 8>,
+    /// Extranonce2 the coinbase of this job was built with, echoed back with its shares (empty
+    /// on a Stratum V2 standard channel).
+    pub extranonce2: Vec<u8, EXTRANONCE_LEN_MAX>,
     pub version: u32,
     pub prev_blockhash: [u8; 32],
     pub merkle_root: [u8; 32],
@@ -28,7 +33,7 @@ impl MiningJob {
     /// order.
     pub fn from_stratum_v1(
         pool_job_id: String<32>,
-        extranonce2: Vec<u8, 8>,
+        extranonce2: &[u8],
         version: i32,
         prev_blockhash_display: [u8; 32],
         merkle_root: [u8; 32],
@@ -37,7 +42,7 @@ impl MiningJob {
     ) -> Self {
         Self {
             pool_job_id,
-            extranonce2,
+            extranonce2: Vec::from_slice(extranonce2).unwrap_or_default(),
             version: version as u32,
             prev_blockhash: reversed(prev_blockhash_display),
             merkle_root,
@@ -115,7 +120,7 @@ pub(crate) mod tests {
     pub(crate) fn genesis_job() -> MiningJob {
         MiningJob::from_stratum_v1(
             String::try_from("genesis").unwrap(),
-            Vec::from_slice(&[0, 0, 0, 1]).unwrap(),
+            &[0, 0, 0, 1],
             1,
             [0; 32],
             reversed(hex!(
@@ -133,7 +138,7 @@ pub(crate) mod tests {
         let merkle_internal = [7; 32];
         let job = MiningJob::from_stratum_v1(
             String::new(),
-            Vec::new(),
+            &[],
             0x2000_0000,
             prev_display,
             merkle_internal,

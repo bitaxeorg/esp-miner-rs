@@ -9,6 +9,10 @@ runner = [
 
 [env]
 DEFMT_LOG = "info"
+# C dependencies (libsecp256k1, for the Stratum V2 handshake) are built for the chip
+CC_xtensa_esp32s3_none_elf = "xtensa-esp32s3-elf-gcc"
+AR_xtensa_esp32s3_none_elf = "xtensa-esp32s3-elf-ar"
+CFLAGS_xtensa_esp32s3_none_elf = "-mlongcalls"
 
 [build]
 rustflags = [
