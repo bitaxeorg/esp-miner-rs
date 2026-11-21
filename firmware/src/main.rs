@@ -2,6 +2,8 @@
 #![no_main]
 #![feature(impl_trait_in_assoc_type)]
 #![recursion_limit = "512"]
+// A devkit compiles the board code without running it.
+#![cfg_attr(feature = "devkit", allow(dead_code, unused_imports))]
 
 extern crate alloc;
 
@@ -78,91 +80,98 @@ async fn main(spawner: Spawner) -> ! {
     // Power on I2C0 (SDA GPIO47, SCL GPIO48, or GPIO44 and GPIO43 on the boards with the colour
     // display): the core regulator (see `vcore`) and the fan controller, which also reads the
     // ASIC temperature (see `cooling`).
+    // A devkit has none of these, nor the ASIC chain.
+    #[cfg(not(feature = "devkit"))]
     static I2C_BUS: StaticCell<Mutex<NoopRawMutex, I2c<'_, esp_hal::Async>>> = StaticCell::new();
-    let i2c = I2c::new(
-        peripherals.I2C0,
-        esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
-    )
-    .unwrap();
-    #[cfg(not(feature = "pins-color"))]
-    let i2c = i2c
-        .with_sda(peripherals.GPIO47)
-        .with_scl(peripherals.GPIO48);
-    #[cfg(feature = "pins-color")]
-    let i2c = i2c
-        .with_sda(peripherals.GPIO44)
-        .with_scl(peripherals.GPIO43);
-    let i2c = i2c.into_async();
-    let i2c_bus = I2C_BUS.init(Mutex::new(i2c));
-    // DS4432 (core voltage) and INA260 (input power). The regulator enable (PWR_EN, GPIO10) is
-    // active low: off until the power task has set the core voltage. The core voltage is read
-    // on ADC1 (GPIO2), calibrated.
-    #[cfg(feature = "vcore-dac")]
-    let vcore = {
-        use esp_hal::analog::adc::{Adc, AdcCalCurve, AdcConfig, Attenuation};
-        let mut adc_config = AdcConfig::new();
-        let vcore_pin = adc_config
-            .enable_pin_with_cal::<_, AdcCalCurve<_>>(peripherals.GPIO2, Attenuation::_11dB);
-        vcore::Vcore::new(
-            ds4432::AsyncDS4432::with_rfs(
-                I2cDevice::new(i2c_bus),
-                Some(board::DS4432_RFS0_OHM),
-                None,
+    #[cfg(not(feature = "devkit"))]
+    let i2c_bus = {
+        let i2c = I2c::new(
+            peripherals.I2C0,
+            esp_hal::i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
+        )
+        .unwrap();
+        #[cfg(not(feature = "pins-color"))]
+        let i2c = i2c
+            .with_sda(peripherals.GPIO47)
+            .with_scl(peripherals.GPIO48);
+        #[cfg(feature = "pins-color")]
+        let i2c = i2c
+            .with_sda(peripherals.GPIO44)
+            .with_scl(peripherals.GPIO43);
+        I2C_BUS.init(Mutex::new(i2c.into_async()))
+    };
+    #[cfg(not(feature = "devkit"))]
+    {
+        // DS4432 (core voltage) and INA260 (input power). The regulator enable (PWR_EN, GPIO10) is
+        // active low: off until the power task has set the core voltage. The core voltage is read
+        // on ADC1 (GPIO2), calibrated.
+        #[cfg(feature = "vcore-dac")]
+        let vcore = {
+            use esp_hal::analog::adc::{Adc, AdcCalCurve, AdcConfig, Attenuation};
+            let mut adc_config = AdcConfig::new();
+            let vcore_pin = adc_config
+                .enable_pin_with_cal::<_, AdcCalCurve<_>>(peripherals.GPIO2, Attenuation::_11dB);
+            vcore::Vcore::new(
+                ds4432::AsyncDS4432::with_rfs(
+                    I2cDevice::new(i2c_bus),
+                    Some(board::DS4432_RFS0_OHM),
+                    None,
+                )
+                .unwrap(),
+                ina260::AsyncINA260::new(I2cDevice::new(i2c_bus))
+                    .await
+                    .unwrap(),
+                Output::new(peripherals.GPIO10, Level::High, OutputConfig::default()),
+                Adc::new(peripherals.ADC1, adc_config).into_async(),
+                vcore_pin,
             )
-            .unwrap(),
-            ina260::AsyncINA260::new(I2cDevice::new(i2c_bus))
+        };
+        // TPS546 over PMBus, off until the power task has configured it, and on some boards an ASIC
+        // power enable (GPIO10) active high, off until then too.
+        #[cfg(feature = "vcore-tps546")]
+        let vcore = vcore::Vcore::new(
+            I2cDevice::new(i2c_bus),
+            #[cfg(feature = "asic-enable")]
+            Some(Output::new(
+                peripherals.GPIO10,
+                Level::Low,
+                OutputConfig::default(),
+            )),
+            #[cfg(not(feature = "asic-enable"))]
+            None,
+        );
+        #[cfg(feature = "fan-emc2101")]
+        let cooling = cooling::Cooling::new(
+            emc2101::AsyncEMC2101::new(I2cDevice::new(i2c_bus))
                 .await
                 .unwrap(),
-            Output::new(peripherals.GPIO10, Level::High, OutputConfig::default()),
-            Adc::new(peripherals.ADC1, adc_config).into_async(),
-            vcore_pin,
-        )
-    };
-    // TPS546 over PMBus, off until the power task has configured it, and on some boards an ASIC
-    // power enable (GPIO10) active high, off until then too.
-    #[cfg(feature = "vcore-tps546")]
-    let vcore = vcore::Vcore::new(
-        I2cDevice::new(i2c_bus),
-        #[cfg(feature = "asic-enable")]
-        Some(Output::new(
-            peripherals.GPIO10,
-            Level::Low,
-            OutputConfig::default(),
-        )),
-        #[cfg(not(feature = "asic-enable"))]
-        None,
-    );
-    #[cfg(feature = "fan-emc2101")]
-    let cooling = cooling::Cooling::new(
-        emc2101::AsyncEMC2101::new(I2cDevice::new(i2c_bus))
-            .await
-            .unwrap(),
-    );
-    #[cfg(feature = "fan-emc2103")]
-    let cooling = cooling::Cooling::new(
-        emc2103::AsyncEMC2103::new(I2cDevice::new(i2c_bus))
-            .await
-            .unwrap(),
-    );
-    #[cfg(feature = "fan-emc2302")]
-    let cooling = cooling::Cooling::new(
-        emc230x::Emc230x::new(I2cDevice::new(i2c_bus), board::EMC2302_ADDRESS)
-            .await
-            .unwrap(),
-        board::TMP1075_ADDRESSES
-            .map(|address| tmp1075::Tmp1075::with_address(address, I2cDevice::new(i2c_bus))),
-    );
-    spawner.spawn(power::power_task(vcore, cooling).unwrap());
+        );
+        #[cfg(feature = "fan-emc2103")]
+        let cooling = cooling::Cooling::new(
+            emc2103::AsyncEMC2103::new(I2cDevice::new(i2c_bus))
+                .await
+                .unwrap(),
+        );
+        #[cfg(feature = "fan-emc2302")]
+        let cooling = cooling::Cooling::new(
+            emc230x::Emc230x::new(I2cDevice::new(i2c_bus), board::EMC2302_ADDRESS)
+                .await
+                .unwrap(),
+            board::TMP1075_ADDRESSES
+                .map(|address| tmp1075::Tmp1075::with_address(address, I2cDevice::new(i2c_bus))),
+        );
+        spawner.spawn(power::power_task(vcore, cooling).unwrap());
 
-    // ASIC chain: UART1 (TX GPIO17, RX GPIO18), NRST on GPIO1 (active low).
-    let uart_config = uart::Config::default().with_baudrate(115_200);
-    let uart = Uart::new(peripherals.UART1, uart_config)
-        .unwrap()
-        .with_tx(peripherals.GPIO17)
-        .with_rx(peripherals.GPIO18)
-        .into_async();
-    let reset = Output::new(peripherals.GPIO1, Level::Low, OutputConfig::default());
-    spawner.spawn(asic::asic_task(asic::AsicUart::new(uart, uart_config), reset).unwrap());
+        // ASIC chain: UART1 (TX GPIO17, RX GPIO18), NRST on GPIO1 (active low).
+        let uart_config = uart::Config::default().with_baudrate(115_200);
+        let uart = Uart::new(peripherals.UART1, uart_config)
+            .unwrap()
+            .with_tx(peripherals.GPIO17)
+            .with_rx(peripherals.GPIO18)
+            .into_async();
+        let reset = Output::new(peripherals.GPIO1, Level::Low, OutputConfig::default());
+        spawner.spawn(asic::asic_task(asic::AsicUart::new(uart, uart_config), reset).unwrap());
+    }
 
     // WiFi: the station of the settings, and the open setup access point until the station has
     // an address

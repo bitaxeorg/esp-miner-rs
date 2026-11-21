@@ -24,7 +24,8 @@ const BOARD_FEATURES: usize = cfg!(feature = "bitaxe-102") as usize
     + cfg!(feature = "bitaxe-702") as usize
     + cfg!(feature = "bitaxe-801") as usize
     + cfg!(feature = "bitaxe-1201") as usize
-    + cfg!(feature = "bitaxe-1300") as usize;
+    + cfg!(feature = "bitaxe-1300") as usize
+    + cfg!(feature = "devkit") as usize;
 const _: () = assert!(
     BOARD_FEATURES == 1,
     "You must activate exactly one board feature: a board number (bitaxe-102, bitaxe-201, \
@@ -32,7 +33,7 @@ const _: () = assert!(
      bitaxe-402, bitaxe-403, bitaxe-600, bitaxe-601, bitaxe-602, bitaxe-603, bitaxe-650, \
      bitaxe-701, bitaxe-702, bitaxe-801, bitaxe-1201, bitaxe-1300) or a family name (bitaxe-max, \
      bitaxe-ultra, bitaxe-hex, bitaxe-supra, bitaxe-gamma, bitaxe-gamma-duo, bitaxe-supra-hex, \
-     bitaxe-gamma-turbo, bitaxe-naja-duo, bitaxe-gamma-hex)"
+     bitaxe-gamma-turbo, bitaxe-naja-duo, bitaxe-gamma-hex), or devkit (an ESP32-S3 module alone)"
 );
 
 /// ASIC driver.
@@ -325,7 +326,7 @@ pub const POWER_OFFSET_W: f32 = 12.0;
 pub const POWER_OFFSET_W: f32 = 25.0;
 #[cfg(feature = "bitaxe-801")]
 pub const POWER_OFFSET_W: f32 = 10.0;
-#[cfg(feature = "bitaxe-1201")]
+#[cfg(any(feature = "bitaxe-1201", feature = "devkit"))]
 pub const POWER_OFFSET_W: f32 = 0.0;
 
 /// ASIC difficulty (ticket mask): chips only report nonces at least this difficult.
@@ -407,7 +408,8 @@ pub const VOLTAGE_OPTIONS: &[u16] = &[1000, 1060, 1100, 1150, 1200, 1250];
     feature = "bitaxe-600",
     feature = "bitaxe-601",
     feature = "bitaxe-602",
-    feature = "bitaxe-603"
+    feature = "bitaxe-603",
+    feature = "devkit"
 ))]
 pub const ASIC_COUNT: u8 = 1;
 #[cfg(any(
@@ -442,7 +444,8 @@ pub const MAX_POWER_W: u16 = 25;
     feature = "bitaxe-601",
     feature = "bitaxe-602",
     feature = "bitaxe-603",
-    feature = "bitaxe-650"
+    feature = "bitaxe-650",
+    feature = "devkit"
 ))]
 pub const MAX_POWER_W: u16 = 40;
 #[cfg(any(feature = "bitaxe-801", feature = "bitaxe-1201"))]
@@ -507,3 +510,5 @@ pub const SWARM_COLOR: &str = "darkblue";
 pub const SWARM_COLOR: &str = "cyan";
 #[cfg(feature = "bitaxe-1201")]
 pub const SWARM_COLOR: &str = "magenta";
+#[cfg(feature = "devkit")]
+pub const SWARM_COLOR: &str = "gray";

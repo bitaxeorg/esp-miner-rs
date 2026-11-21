@@ -162,6 +162,10 @@ bitaxe-1300 = [
     "pins-color",
     "vcore-tps546",
 ]
+# An ESP32-S3 module alone (no ASIC, regulator, fan or display): Wi-Fi, web interface, settings,
+# OTA and pool session, for development. Its parts only give the types the web interface uses;
+# none is driven.
+devkit = ["asic-bm1370", "fan-emc2101", "vcore-tps546"]
 # A board by its name: the latest revision of the family.
 bitaxe-max = ["bitaxe-102"]
 bitaxe-ultra = ["bitaxe-207"]

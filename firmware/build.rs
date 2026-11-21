@@ -1,4 +1,5 @@
-//! Board number and family name of the selected `bitaxe-<number>` feature, for the firmware:
+//! Board number and family name of the selected `bitaxe-<number>` feature (`DevKit` and no number
+//! for `devkit`), for the firmware:
 //! `BOARD_VERSION` and `BOARD_NAME`; and the web assets of `web/`, gzipped into `OUT_DIR`.
 
 use std::{env, fs, path::Path};
@@ -25,6 +26,7 @@ fn main() {
         .next()
         .unwrap_or_default();
     let name = match version.parse::<u32>().unwrap_or(0) {
+        _ if env::var_os("CARGO_FEATURE_DEVKIT").is_some() => "DevKit",
         100..=199 => "Max",
         200..=299 => "Ultra",
         300..=399 => "Hex",
