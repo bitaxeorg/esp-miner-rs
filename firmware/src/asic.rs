@@ -2,8 +2,7 @@
 
 use core::{cell::Cell, convert::Infallible, fmt::Write};
 
-use bm13xx_asic::register::GotNonceCounter;
-use bm13xx_chain::{Baud, Chain};
+use bm13xx_chain::{Baud, Chain, HASHES_PER_COUNT, MAX_HASH_DOMAINS};
 use bm13xx_protocol::response::ResponseType;
 use defmt::{debug, error, info, warn};
 use embassy_time::{Delay, Duration, Instant, Timer};
@@ -27,7 +26,9 @@ use crate::{
     board,
     pool::{CLEAN_JOBS, JOBS, POOL_DIFFICULTY, SHARES, VERSION_MASK, VERSION_MASK_REQUEST},
     power::{self, POWER_READY, RESTART_CHAIN},
-    settings, stats, status, wlog,
+    settings, stats,
+    status::{self, ChipHashrate},
+    wlog,
 };
 
 /// How often to poll the chain for responses.
@@ -134,6 +135,8 @@ pub async fn asic_task(mut uart: AsicUart, mut reset: Output<'static>) {
             RESTART_CHAIN.reset();
             if let Err(e) = run_chain(&mut uart, &mut reset).await {
                 wlog!(Error, "asic", "chain error: {:?}", e);
+                let message = status_text(format_args!("Chain error: {e:?}"));
+                status::update(|s| s.asic_status = Some(message));
                 Timer::after(RETRY_DELAY).await;
             }
         }
@@ -142,6 +145,7 @@ pub async fn asic_task(mut uart: AsicUart, mut reset: Output<'static>) {
             s.hashrate_ghs = 0.0;
             s.hashrate_1m = 0.0;
             s.expected_hashrate_ghs = 0.0;
+            s.asic_status = None;
         });
     }
 }
@@ -155,6 +159,12 @@ async fn run_chain(uart: &mut AsicUart, reset: &mut Output<'static>) -> Result<(
     Timer::after(RESET_DURATION).await;
     let mut chain = Chain::enumerate(board::Asic::default(), uart, NoBusy, reset, Delay).await?;
     wlog!(Info, "asic", "{} ASIC(s) found", chain.asic_cnt);
+    if chain.asic_cnt == 0 {
+        let message = status_text(format_args!("ASIC chain detection failed"));
+        status::update(|s| s.asic_status = Some(message));
+        Timer::after(RETRY_DELAY).await;
+        return Ok(());
+    }
     chain.set_domain_cnt(board::VOLTAGE_DOMAINS);
     chain.init(board::ASIC_DIFFICULTY).await?;
     chain.change_baudrate(board::ASIC_BAUDRATE).await?;
@@ -180,6 +190,7 @@ async fn run_chain(uart: &mut AsicUart, reset: &mut Output<'static>) -> Result<(
     let expected = chain.theoretical_hashrate_ghs() as f32;
     let asics = chain.asic_cnt as u8;
     status::update(|s| {
+        s.asic_status = None;
         s.expected_hashrate_ghs = expected;
         s.asic_count = asics;
         s.frequency_mhz = frequency;
@@ -194,6 +205,9 @@ async fn run_chain(uart: &mut AsicUart, reset: &mut Output<'static>) -> Result<(
     let mut invalid_10m = HashrateMeter::<60>::new(now, BUCKET_10S_MS);
     // Hashes the chips count, in nonces at difficulty 1.
     let mut counters = HashCounters::<{ board::ASIC_COUNT as usize }>::default();
+    let mut domain_counters =
+        HashCounters::<{ board::ASIC_COUNT as usize * MAX_HASH_DOMAINS }>::default();
+    let mut counters_read = Instant::now();
     let mut counted_1m = HashrateMeter::<6>::new(now, BUCKET_10S_MS);
     let mut counted_10m = HashrateMeter::<60>::new(now, BUCKET_10S_MS);
     let mut counted_1h = HashrateMeter::<60>::new(now, BUCKET_1MIN_MS);
@@ -225,12 +239,33 @@ async fn run_chain(uart: &mut AsicUart, reset: &mut Output<'static>) -> Result<(
             }
         }
         if board::HASH_COUNTERS && Instant::now() >= next_counters {
-            let mut counts = 0u32;
-            for i in 0..chain.asic_cnt {
-                if let Some(value) = chain.read_register(i, GotNonceCounter::ADDR).await? {
-                    counts = counts.saturating_add(counters.delta(i, value));
+            let seconds = counters_read.elapsed().as_millis() as f32 / 1000.0;
+            counters_read = Instant::now();
+            let ghs = |counts: u32| {
+                if seconds > 0.0 {
+                    counts as f32 * HASHES_PER_COUNT as f32 / seconds / 1e9
+                } else {
+                    0.0
                 }
+            };
+            let mut counts = 0u32;
+            let mut chips = heapless::Vec::<ChipHashrate, { board::ASIC_COUNT as usize }>::new();
+            for i in 0..chain.asic_cnt {
+                let mut chip = ChipHashrate::default();
+                if let Some(value) = chain.read_hash_counter(i).await? {
+                    let delta = counters.delta(i, value);
+                    counts = counts.saturating_add(delta);
+                    chip.total = ghs(delta);
+                }
+                if let Some(values) = chain.read_hash_domain_counters(i).await? {
+                    for (d, value) in values.iter().enumerate() {
+                        let delta = domain_counters.delta(i * MAX_HASH_DOMAINS + d, *value);
+                        let _ = chip.domains.push(ghs(delta));
+                    }
+                }
+                let _ = chips.push(chip);
             }
+            status::update(|s| s.chip_hashrates = chips);
             let now = Instant::now().as_millis();
             counted_1m.record_n(now, counts);
             counted_10m.record_n(now, counts);
@@ -287,6 +322,19 @@ async fn run_chain(uart: &mut AsicUart, reset: &mut Output<'static>) -> Result<(
         }
         Timer::after(POLL_PERIOD).await;
     }
+}
+
+/// The message for the ASIC status screen, cut to the status text's length.
+fn status_text(args: core::fmt::Arguments) -> String<128> {
+    let mut long = String::<256>::new();
+    let _ = long.write_fmt(args);
+    let mut text = String::new();
+    for c in long.chars() {
+        if text.push(c).is_err() {
+            break;
+        }
+    }
+    text
 }
 
 /// Checks a nonce returned by a chip and queues it as a share if the pool wants it. Returns the

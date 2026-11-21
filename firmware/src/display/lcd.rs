@@ -18,7 +18,7 @@ use esp_hal::{
 use heapless::Vec;
 use miner_core::{
     carousel::Screen,
-    ui::{column_top, Align, Font, Label},
+    ui::{column_top, draw_qr, Align, Font, Label},
     units,
 };
 
@@ -28,7 +28,7 @@ use super::{
         ANGEL_WISH_40, DIGITAL_NUMBERS_16, DIGITAL_NUMBERS_28, OPEN_SANS_BOLD_13,
         OPEN_SANS_BOLD_14, UNSCII_16,
     },
-    images::BACKGROUND,
+    images::{self, BACKGROUND},
     run, Panel, Text, View,
 };
 use crate::board;
@@ -44,6 +44,9 @@ pub const ROW_BYTES: usize = WIDTH * ROW_HEIGHT * 2;
 /// Space around the column screens, and between their lines.
 const PADDING: i32 = 8;
 const LINE_PAD: i32 = 1;
+/// Side of the QR code beside the connection screen, and the gap before it.
+const QR_SIZE: i32 = 72;
+const QR_GAP: i32 = 8;
 const WHITE: [u8; 2] = [0xFF, 0xFF];
 
 // ST7789 commands
@@ -276,19 +279,7 @@ impl Lcd {
     fn items(view: &View<'_>) -> (Vec<Item, 16>, bool) {
         let mut items = Vec::new();
         if view.identify {
-            let text = text(format_args!("Hi!"));
-            let width = UNSCII_16.text_width(&text);
-            let height = i32::from(UNSCII_16.line_height);
-            let _ = items.push(Item {
-                text,
-                x: (WIDTH as i32 - width) / 2,
-                y: (HEIGHT as i32 - height) / 2,
-                width,
-                height,
-                font: &UNSCII_16,
-                align: Align::Left,
-                scroll_ms: None,
-            });
+            // the identify image alone, drawn by `draw`
             return (items, false);
         }
         if view.screen == Screen::Stats {
@@ -337,6 +328,10 @@ impl Lcd {
                 let _ = items.push(item);
             }
         } else {
+            let mut width = WIDTH as i32 - 2 * PADDING;
+            if view.qr().is_some() {
+                width -= QR_SIZE + QR_GAP;
+            }
             let lines = view.lines();
             let line_height = i32::from(UNSCII_16.line_height);
             let top = column_top(
@@ -351,7 +346,7 @@ impl Lcd {
                     text: line,
                     x: PADDING,
                     y: top + i as i32 * (line_height + LINE_PAD),
-                    width: WIDTH as i32 - 2 * PADDING,
+                    width,
                     height: line_height,
                     font: &UNSCII_16,
                     align: Align::Left,
@@ -380,6 +375,9 @@ impl Panel for Lcd {
 
     async fn draw(&mut self, view: &View<'_>) {
         let (items, background) = Self::items(view);
+        let qr = view.qr();
+        let qr_x = WIDTH as i32 - PADDING - QR_SIZE;
+        let qr_y = (HEIGHT as i32 - QR_SIZE) / 2;
         for y0 in (0..HEIGHT).step_by(ROW_HEIGHT) {
             let result = self
                 .draw_band(y0, |band| {
@@ -400,6 +398,19 @@ impl Panel for Lcd {
                             band[i..i + 2].copy_from_slice(&WHITE);
                         }
                     };
+                    if let Some(qr) = &qr {
+                        if qr_y < band_top + ROW_HEIGHT as i32 && qr_y + QR_SIZE > band_top {
+                            draw_qr(qr, qr_x, qr_y, QR_SIZE, &mut plot);
+                        }
+                    }
+                    if view.identify {
+                        let image = &images::IDENTIFY;
+                        image.draw(
+                            (WIDTH as i32 - image.width) / 2,
+                            (HEIGHT as i32 - image.height) / 2,
+                            &mut plot,
+                        );
+                    }
                     for item in &items {
                         if item.y < band_top + ROW_HEIGHT as i32 && item.y + item.height > band_top
                         {

@@ -12,6 +12,7 @@ publish = false
 bitcoin_hashes = { version = "1.2", default-features = false }
 defmt = { version = "1.2.0", optional = true }
 heapless = { version = "0.9.3", default-features = false, features = ["serde"] }
+qrcodegen-no-heap = "1.8.1"
 serde = { version = "1.0.228", default-features = false, features = ["derive"] }
 serde-json-core = { version = "0.7.0", default-features = false }
 

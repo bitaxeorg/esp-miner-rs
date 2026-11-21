@@ -558,7 +558,53 @@ pub async fn home_live() -> Reply {
         );
     }
     out.push_str("</table></div></div>");
+    hashrate_registers(&mut out, &s);
     Reply::html(out)
+}
+
+/// The Hashrate Registers card: each chip's hashrate in total and per hash domain, from its hash
+/// counters. A domain's bar spans twice its nominal rate, with a marker at the nominal rate.
+fn hashrate_registers(out: &mut String, s: &Status) {
+    let domains = s
+        .chip_hashrates
+        .iter()
+        .map(|c| c.domains.len())
+        .max()
+        .unwrap_or(0);
+    if domains == 0 {
+        return;
+    }
+    let nominal = s.expected_hashrate_ghs / s.chip_hashrates.len() as f32 / domains as f32;
+    out.push_str(
+        "<div class='card'><div class='card-title'>Hashrate Registers</div>\
+         <table class='data'><tr><th>ASIC</th><th>Total</th>",
+    );
+    for d in 0..domains {
+        let _ = write!(out, "<th>Domain {d}</th>");
+    }
+    out.push_str("</tr>");
+    for (i, chip) in s.chip_hashrates.iter().enumerate() {
+        let _ = write!(
+            out,
+            "<tr><td>{i}</td><td>{}</td>",
+            hash_suffix(chip.total.into())
+        );
+        for &domain in &chip.domains {
+            let pct = if nominal > 0.0 {
+                (domain / nominal * 50.0).clamp(0.0, 100.0)
+            } else {
+                0.0
+            };
+            let _ = write!(
+                out,
+                "<td>{}<div class='bar'><span style='width:{pct:.0}%'></span>\
+                 <div class='marker' style='left:50%'></div></div></td>",
+                hash_suffix(domain.into())
+            );
+        }
+        out.push_str("</tr>");
+    }
+    out.push_str("</table></div>");
 }
 
 fn log2(x: f64) -> f64 {

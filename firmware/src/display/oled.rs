@@ -6,7 +6,7 @@ use embedded_hal_async::i2c::I2c;
 use esp_hal::gpio::Input;
 use miner_core::{
     carousel::Screen,
-    ui::{column_top, Align, Label},
+    ui::{column_top, draw_qr, Align, Label},
 };
 use ssd1306::{
     mode::BufferedGraphicsModeAsync, prelude::*, size::DisplaySize128x32, I2CDisplayInterface,
@@ -25,6 +25,9 @@ const WIDTH: i32 = 128;
 const HEIGHT: i32 = 32;
 /// Space between the logo screen texts and the right edge.
 const LOGO_TEXT_MARGIN: i32 = 8;
+/// Side of the QR code beside the connection screen, and the gap before it.
+const QR_SIZE: i32 = 32;
+const QR_GAP: i32 = 2;
 
 type Display = Ssd1306Async<
     I2CInterface<BusDevice>,
@@ -48,18 +51,12 @@ impl Panel for Oled {
         let font = &PORTFOLIO_6X8;
         let line_height = i32::from(font.line_height);
         if view.identify {
-            // "Hi!" three times the font size, centred
-            const SCALE: i32 = 3;
-            let text = "Hi!";
-            let x0 = (WIDTH - font.text_width(text) * SCALE) / 2;
-            let y0 = (HEIGHT - line_height * SCALE) / 2;
-            font.draw(text, 0, 0, &mut |x, y| {
-                for dy in 0..SCALE {
-                    for dx in 0..SCALE {
-                        plot(x0 + x * SCALE + dx, y0 + y * SCALE + dy);
-                    }
-                }
-            });
+            let image = &images::IDENTIFY;
+            image.draw(
+                (WIDTH - image.width) / 2,
+                (HEIGHT - image.height) / 2,
+                &mut plot,
+            );
             if let Err(e) = display.flush().await {
                 warn!("OLED display update failed: {}", Debug2Format(&e));
             }
@@ -88,6 +85,12 @@ impl Panel for Oled {
                 );
             }
             _ => {
+                let mut width = WIDTH;
+                if let Some(qr) = view.qr() {
+                    if draw_qr(&qr, WIDTH - QR_SIZE, 0, QR_SIZE, &mut plot) {
+                        width -= QR_SIZE + QR_GAP;
+                    }
+                }
                 let lines = view.lines();
                 let top = column_top(lines.len(), line_height, 0, 0, HEIGHT);
                 for (i, (text, scroll)) in lines.iter().enumerate() {
@@ -96,7 +99,7 @@ impl Panel for Oled {
                         text,
                         x: 0,
                         y: top + i as i32 * line_height,
-                        width: WIDTH,
+                        width,
                         height: line_height,
                         align: Align::Left,
                         scroll_ms: scroll.then_some(view.screen_ms),

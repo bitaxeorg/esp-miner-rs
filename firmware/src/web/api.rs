@@ -343,6 +343,22 @@ pub async fn info_json() -> String {
     let mut full = heapless::String::<48>::new();
     let _ = write!(full, "{}.local", set.hostname);
     j.field_str("fullHostname", &full);
+    // per-chip and per-domain hashrate from the chips' hash counters (GH/s)
+    j.key("hashrateMonitor")
+        .begin_object()
+        .key("asics")
+        .begin_array();
+    for chip in &s.chip_hashrates {
+        j.begin_object()
+            .field_float("total", f64::from(chip.total))
+            .key("domains")
+            .begin_array();
+        for domain in &chip.domains {
+            j.float(f64::from(*domain));
+        }
+        j.end_array().end_object();
+    }
+    j.end_array().end_object();
     j.end_object();
     let _ = j.finish();
     out

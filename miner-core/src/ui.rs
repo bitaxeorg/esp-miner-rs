@@ -185,6 +185,43 @@ pub fn column_top(lines: usize, line_height: i32, pad: i32, top: i32, height: i3
     top + (height - content) / 2
 }
 
+/// Largest QR code version [`draw_qr`] makes: 29 modules, up to 53 bytes at low error correction.
+const QR_MAX_VERSION: qrcodegen_no_heap::Version = qrcodegen_no_heap::Version::new(3);
+
+/// Draws the QR code of `text` in the `size` × `size` square at `(x, y)`, its modules whole pixels
+/// and centred. `plot` gets the light pixels, around the code and between its dark modules: a
+/// scanner wants the code dark on light. False, drawing nothing, when `text` does not fit.
+pub fn draw_qr(text: &str, x: i32, y: i32, size: i32, plot: &mut impl FnMut(i32, i32)) -> bool {
+    use qrcodegen_no_heap::{QrCode, QrCodeEcc, Version};
+    let mut temp = [0u8; QR_MAX_VERSION.buffer_len()];
+    let mut out = [0u8; QR_MAX_VERSION.buffer_len()];
+    let Ok(qr) = QrCode::encode_text(
+        text,
+        &mut temp,
+        &mut out,
+        QrCodeEcc::Low,
+        Version::MIN,
+        QR_MAX_VERSION,
+        None,
+        true,
+    ) else {
+        return false;
+    };
+    let modules = qr.size();
+    let scale = (size / modules).max(1);
+    let offset = (size - modules * scale) / 2;
+    for py in 0..size {
+        for px in 0..size {
+            let module_x = (px - offset).div_euclid(scale);
+            let module_y = (py - offset).div_euclid(scale);
+            if !qr.get_module(module_x, module_y) {
+                plot(x + px, y + py);
+            }
+        }
+    }
+    true
+}
+
 /// A monochrome image: rows of `width` bits, most significant bit first, each row starting on a
 /// byte.
 pub struct MonoImage {
@@ -322,5 +359,39 @@ mod tests {
         };
         let drawn = pixels(|plot| image.draw(5, 5, &mut |x, y| plot(x, y)));
         assert_eq!(drawn, [(5, 5), (6, 6)]);
+    }
+
+    #[test]
+    fn qr_codes_fit_their_square() {
+        // a setup access point: version 2 (25 modules), one pixel each, 3 px left over in 28
+        let text = "WIFI:S:Bitaxe_17AF;;";
+        let mut light = [[false; 28]; 28];
+        assert!(draw_qr(text, 0, 0, 28, &mut |x, y| {
+            light[y as usize][x as usize] = true;
+        }));
+        let at = |x: usize, y: usize| !light[y][x];
+        // the margin is light, the top-left finder pattern dark at its corners and light inside
+        assert!(!at(0, 0) && !at(27, 27));
+        assert!(at(1, 1) && at(7, 1) && at(1, 7) && at(7, 7));
+        assert!(!at(2, 2) && at(3, 3));
+        // two pixels per module in a square twice as large
+        let mut large = [[false; 56]; 56];
+        draw_qr(text, 0, 0, 56, &mut |x, y| {
+            large[y as usize][x as usize] = true;
+        });
+        for y in 0..28 {
+            for x in 0..28 {
+                assert_eq!(large[y * 2 + 1][x * 2 + 1], light[y][x], "{x} {y}");
+            }
+        }
+    }
+
+    #[test]
+    fn qr_codes_refuse_long_texts() {
+        let long = [b'a'; 60];
+        let text = core::str::from_utf8(&long).unwrap();
+        let mut plotted = 0;
+        assert!(!draw_qr(text, 0, 0, 32, &mut |_, _| plotted += 1));
+        assert_eq!(plotted, 0);
     }
 }

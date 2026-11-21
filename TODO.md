@@ -6,14 +6,8 @@ The screens follow AxeOS (ESP-Miner) except for the following.
 
 ### Screens not ported
 
-- **Welcome** (no WiFi configured): the QR code of the setup access point. The connection screen
-  names the access point, without the QR code; it needs a QR code renderer (72 px on the LCD, 32 px
-  on the OLED).
 - **Self-test**: results of the factory self-test, and its long-press reset.
-- **ASIC status**: the error message when the ASIC chain doesn't come up.
 - **Firmware update**: file name and progress of an OTA update.
-- **Identify**: AxeOS shows an image; ours writes "Hi!".
-- **Paused**: AxeOS shows `▐▐`; ours `||` in the notification corner.
 
 ### Behaviour
 
@@ -29,8 +23,9 @@ labels and formats, not its exact look.
 
 ### Pages
 
-- **Dashboard**: no layout editing (widgets, wide view), no Hashrate Registers card (per-domain
-  hashrate), no sensitive-data toggle, no confetti. The chart is drawn on the device: hashrate and
+- **Dashboard**: no layout editing (widgets, wide view), no sensitive-data toggle, no confetti. The
+  Hashrate Registers card shows each domain's hashrate over the last 5 s with a marker at its
+  nominal rate, not AxeOS's sparkline history. The chart is drawn on the device: hashrate and
   ASIC temperature only, no series choice, no tooltips.
 - **Pool**: one pool saved at a time, Stratum V1 fields only (no SV2, TLS or certificate), no
   quick links to the pool dashboards.
@@ -45,7 +40,8 @@ labels and formats, not its exact look.
 ### API
 
 - **WebSockets** `/api/ws` (logs) and `/api/ws/live` (live data): not implemented; the pages poll.
-- **Missing data** in `/api/system/info`: rejected share reasons, coinbase outputs, value and payout
+- **Missing data** in `/api/system/info`: rejected share reasons, the per-chip `errorCount` of
+  `hashrateMonitor`, coinbase outputs, value and payout
   status, pool banner, share batching, CPU usage, heap statistics beyond the free heap, reset
   reason, IPv6, total uptime across reboots (= uptime), power and hardware faults, second fan.
 - **Statistics**: 300 samples taken at the data logging interval; AxeOS keeps 720, sampled every

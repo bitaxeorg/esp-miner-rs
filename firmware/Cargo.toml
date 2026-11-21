@@ -12,13 +12,12 @@ categories = ["embedded", "no-std", "bitcoin"]
 
 [dependencies]
 bitcoin_hashes = { version = "1.2", default-features = false }
-bm1366 = { version = "0.4.0", features = ["defmt"], optional = true }
-bm1368 = { version = "0.4.0", features = ["defmt"], optional = true }
-bm1370 = { version = "0.4.0", features = ["defmt"], optional = true }
-bm1372 = { version = "0.4.0", features = ["defmt"], optional = true }
+bm1366 = { version = "0.4.1", features = ["defmt"], optional = true }
+bm1368 = { version = "0.4.1", features = ["defmt"], optional = true }
+bm1370 = { version = "0.4.1", features = ["defmt"], optional = true }
+bm1372 = { version = "0.4.1", features = ["defmt"], optional = true }
 bm1397 = { version = "0.4.0", features = ["defmt"], optional = true }
-bm13xx-asic = { version = "0.4.0", features = ["defmt"] }
-bm13xx-chain = { version = "0.4.1", features = ["defmt"] }
+bm13xx-chain = { version = "0.4.3", features = ["defmt"] }
 bm13xx-protocol = { version = "0.4.0", features = ["defmt"] }
 bounded-integer = "0.6"
 defmt = "1.2.0"

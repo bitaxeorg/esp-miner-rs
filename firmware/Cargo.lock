@@ -160,9 +160,9 @@ dependencies = [
 
 [[package]]
 name = "bm1366"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87646ed3be00ab02bd1a2349c1eb0ba95f1a8f0db023f0e01d243309d2b2d8fe"
+checksum = "8568907f1be6b513975569bcf5a36b61056f35d1635486caa949dacad8d7df8a"
 dependencies = [
  "bm13xx-asic",
  "bm13xx-protocol",
@@ -173,9 +173,9 @@ dependencies = [
 
 [[package]]
 name = "bm1368"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d85ed16eee4a5028b770ca353ad7aa6913cb114db351137a0b15d1ca826d038f"
+checksum = "7c36e374180db1a8a7ba9d2d8027362684deade9e7d0e9b5327f1fa49eba8cbd"
 dependencies = [
  "bm13xx-asic",
  "bm13xx-protocol",
@@ -186,9 +186,9 @@ dependencies = [
 
 [[package]]
 name = "bm1370"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74b5cc7033b64920a64f3db65321b8c2c8c544d5c41ddd983a8f032a1ac12735"
+checksum = "d2f6d0e7f5c0af6273107db55ca4dec9d1afe8493196b4c8630a15bbdfee175d"
 dependencies = [
  "bm13xx-asic",
  "bm13xx-protocol",
@@ -199,9 +199,9 @@ dependencies = [
 
 [[package]]
 name = "bm1372"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "796fa07112a467886afd867a950d7b433cbb1bec20e779f9a7d805c272129b54"
+checksum = "0e6590e5a0e26968d104835567883346c86b2cb05d7895e01c2620bd77effbb2"
 dependencies = [
  "bm13xx-asic",
  "bm13xx-protocol",
@@ -225,9 +225,9 @@ dependencies = [
 
 [[package]]
 name = "bm13xx-asic"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d4d818d103d55b6a916e10425812c1ef097fcd4d4bdaf943c88ea121ab661f1"
+checksum = "7926391c4550062d157c1f0fb88f5e1c2aab6fd78dc33e72d33ef725cd596d0b"
 dependencies = [
  "bm13xx-protocol",
  "defmt 1.2.0",
@@ -237,9 +237,9 @@ dependencies = [
 
 [[package]]
 name = "bm13xx-chain"
-version = "0.4.1"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b45ee417aae1483289c92a082f4d2eea280ed6f0d3468fdbb44a760bde3b314"
+checksum = "8ba2eb3ea0b0d79e86a497500708a27930655cde647c2d2aa3ef554d0f926d3e"
 dependencies = [
  "bm13xx-asic",
  "bm13xx-protocol",
@@ -1374,7 +1374,6 @@ dependencies = [
  "bm1370",
  "bm1372",
  "bm1397",
- "bm13xx-asic",
  "bm13xx-chain",
  "bm13xx-protocol",
  "bounded-integer",
@@ -2226,6 +2225,7 @@ dependencies = [
  "bitcoin_hashes",
  "defmt 1.2.0",
  "heapless 0.9.3",
+ "qrcodegen-no-heap",
  "serde",
  "serde-json-core 0.7.0",
 ]
@@ -2514,6 +2514,12 @@ dependencies = [
  "memchr",
  "unicase",
 ]
+
+[[package]]
+name = "qrcodegen-no-heap"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0e2c0bf8be8a1c4a4f48973dabf26943f05da2bfc2d3180aae62409dbba6f0c"
 
 [[package]]
 name = "quote"

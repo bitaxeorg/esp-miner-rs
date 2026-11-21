@@ -2,9 +2,19 @@
 
 use core::cell::RefCell;
 
+use bm13xx_chain::MAX_HASH_DOMAINS;
 use embassy_sync::blocking_mutex::{raw::CriticalSectionRawMutex, Mutex};
-use heapless::String;
+use heapless::{String, Vec};
 use miner_core::coinbase::CoinbaseInfo;
+
+use crate::board;
+
+/// Hashrate of one chip from its hash counters (GH/s), in total and per hash domain.
+#[derive(Clone, Default)]
+pub struct ChipHashrate {
+    pub total: f32,
+    pub domains: Vec<f32, MAX_HASH_DOMAINS>,
+}
 
 #[derive(Clone)]
 pub struct Status {
@@ -27,6 +37,10 @@ pub struct Status {
     /// Chips found on the chain, and the frequency they run at (MHz).
     pub asic_count: u8,
     pub frequency_mhz: f32,
+    /// Why the chain did not come up, until it does.
+    pub asic_status: Option<String<128>>,
+    /// Hashrate of each chip from its hash counters, over the last reading period.
+    pub chip_hashrates: Vec<ChipHashrate, { board::ASIC_COUNT as usize }>,
     /// Temperature of the hottest chip (°C), NaN until read.
     pub asic_temp_c: f32,
     /// The chip temperatures the board measures (°C), NaN when absent or unread.
@@ -97,6 +111,8 @@ impl Status {
             best_difficulty_ever: 0.0,
             total_hashes: 0.0,
             asic_count: 0,
+            asic_status: None,
+            chip_hashrates: Vec::new(),
             frequency_mhz: 0.0,
             asic_temp_c: f32::NAN,
             chip_temps_c: [f32::NAN; 2],

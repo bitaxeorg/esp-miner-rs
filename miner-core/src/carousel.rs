@@ -3,6 +3,7 @@
 /// A status screen, in carousel order from [`Screen::Connection`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Screen {
+    AsicStatus,
     Overheat,
     Connection,
     BitaxeLogo,
@@ -17,7 +18,7 @@ impl Screen {
     /// Time on the screen before the next one (ms).
     fn delay_ms(self) -> u32 {
         match self {
-            Screen::Overheat => 0,
+            Screen::AsicStatus | Screen::Overheat => 0,
             Screen::Connection => 1_000,
             Screen::BitaxeLogo | Screen::OsmuLogo => 3_000,
             Screen::Urls | Screen::Stats | Screen::Mining | Screen::Wifi => 10_000,
@@ -27,7 +28,7 @@ impl Screen {
     /// The screen after this one: the carousel loops from [`Screen::Urls`] to [`Screen::Wifi`].
     fn next(self) -> Screen {
         match self {
-            Screen::Overheat | Screen::Connection => Screen::BitaxeLogo,
+            Screen::AsicStatus | Screen::Overheat | Screen::Connection => Screen::BitaxeLogo,
             Screen::BitaxeLogo => Screen::OsmuLogo,
             Screen::OsmuLogo => Screen::Urls,
             Screen::Urls => Screen::Stats,
@@ -40,7 +41,8 @@ impl Screen {
 
 /// The screen shown, from the miner state, the time and the button.
 ///
-/// The overheat screen while the chips are off after an overheat. Without network, the connection screen. With it, the
+/// The ASIC status screen while the chain fails to come up, then the overheat screen while the
+/// chips are off after an overheat. Without network, the connection screen. With it, the
 /// connection screen a second more, then the Bitaxe and OSMU logos, then the URLs, statistics,
 /// mining and Wi-Fi screens in a loop, each for its delay or until the button. A large display
 /// shows the statistics screen alone once connected.
@@ -61,10 +63,18 @@ impl Carousel {
     }
 
     /// The screen to show `dt_ms` after the last update.
-    pub fn update(&mut self, dt_ms: u32, connected: bool, overheat: bool) -> Screen {
-        if overheat {
+    pub fn update(
+        &mut self,
+        dt_ms: u32,
+        connected: bool,
+        overheat: bool,
+        asic_error: bool,
+    ) -> Screen {
+        if asic_error {
+            self.show(Screen::AsicStatus);
+        } else if overheat {
             self.show(Screen::Overheat);
-        } else if !connected || self.screen == Screen::Overheat {
+        } else if !connected || matches!(self.screen, Screen::Overheat | Screen::AsicStatus) {
             self.show(Screen::Connection);
         } else if self.large {
             self.show(Screen::Stats);
@@ -80,7 +90,7 @@ impl Carousel {
     /// The button: the next screen of the carousel, or the statistics on a large display.
     pub fn button(&mut self) -> Screen {
         match self.screen {
-            Screen::Overheat => {}
+            Screen::AsicStatus | Screen::Overheat => {}
             _ if self.large => self.show(Screen::Stats),
             screen => self.show(screen.next()),
         }
@@ -107,21 +117,27 @@ mod tests {
     #[test]
     fn connection_until_the_network_is_up() {
         let mut carousel = Carousel::new(false);
-        assert_eq!(carousel.update(60_000, false, false), Screen::Connection);
+        assert_eq!(
+            carousel.update(60_000, false, false, false),
+            Screen::Connection
+        );
         // a second more once connected
-        assert_eq!(carousel.update(1_000, true, false), Screen::Connection);
-        assert_eq!(carousel.update(500, true, false), Screen::BitaxeLogo);
+        assert_eq!(
+            carousel.update(1_000, true, false, false),
+            Screen::Connection
+        );
+        assert_eq!(carousel.update(500, true, false, false), Screen::BitaxeLogo);
     }
 
     #[test]
     fn logos_then_a_loop() {
         let mut carousel = Carousel::new(false);
-        carousel.update(1_500, true, false);
+        carousel.update(1_500, true, false, false);
         let mut seen = [Screen::Connection; 8];
         for screen in seen.iter_mut() {
             // 500 ms steps, as the display refreshes
             loop {
-                let shown = carousel.update(500, true, false);
+                let shown = carousel.update(500, true, false, false);
                 if carousel.elapsed_ms() == 0 {
                     *screen = shown;
                     break;
@@ -146,31 +162,48 @@ mod tests {
     #[test]
     fn the_button_moves_on() {
         let mut carousel = Carousel::new(false);
-        carousel.update(0, true, false);
+        carousel.update(0, true, false, false);
         assert_eq!(carousel.button(), Screen::BitaxeLogo);
         assert_eq!(carousel.button(), Screen::OsmuLogo);
         assert_eq!(carousel.button(), Screen::Urls);
-        assert_eq!(carousel.update(500, true, false), Screen::Urls);
+        assert_eq!(carousel.update(500, true, false, false), Screen::Urls);
     }
 
     #[test]
     fn large_displays_show_the_statistics() {
         let mut carousel = Carousel::new(true);
-        assert_eq!(carousel.update(500, false, false), Screen::Connection);
-        assert_eq!(carousel.update(500, true, false), Screen::Stats);
-        assert_eq!(carousel.update(60_000, true, false), Screen::Stats);
+        assert_eq!(
+            carousel.update(500, false, false, false),
+            Screen::Connection
+        );
+        assert_eq!(carousel.update(500, true, false, false), Screen::Stats);
+        assert_eq!(carousel.update(60_000, true, false, false), Screen::Stats);
         assert_eq!(carousel.button(), Screen::Stats);
     }
 
     #[test]
     fn overheat_shows_while_set() {
         let mut carousel = Carousel::new(false);
-        carousel.update(500, true, false);
-        assert_eq!(carousel.update(500, true, true), Screen::Overheat);
+        carousel.update(500, true, false, false);
+        assert_eq!(carousel.update(500, true, true, false), Screen::Overheat);
         assert_eq!(carousel.button(), Screen::Overheat);
-        assert_eq!(carousel.update(500, true, true), Screen::Overheat);
+        assert_eq!(carousel.update(500, true, true, false), Screen::Overheat);
         // cooled down: back through the connection screen
-        assert_eq!(carousel.update(500, true, false), Screen::Connection);
-        assert_eq!(carousel.update(1500, true, false), Screen::BitaxeLogo);
+        assert_eq!(carousel.update(500, true, false, false), Screen::Connection);
+        assert_eq!(
+            carousel.update(1500, true, false, false),
+            Screen::BitaxeLogo
+        );
+    }
+
+    #[test]
+    fn asic_status_shows_first() {
+        let mut carousel = Carousel::new(true);
+        assert_eq!(carousel.update(500, false, true, true), Screen::AsicStatus);
+        assert_eq!(carousel.button(), Screen::AsicStatus);
+        assert_eq!(carousel.update(500, true, false, true), Screen::AsicStatus);
+        // the chain is up: back through the connection screen
+        assert_eq!(carousel.update(500, true, false, false), Screen::Connection);
+        assert_eq!(carousel.update(500, true, false, false), Screen::Stats);
     }
 }

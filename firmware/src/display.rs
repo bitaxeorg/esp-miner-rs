@@ -36,8 +36,8 @@ pub use lcd::{display_task, Lcd, ROW_BYTES};
 #[cfg(feature = "display-oled")]
 pub use oled::display_task;
 
-/// A text of the screens, long enough for the longest: a scriptsig.
-type Text = String<{ miner_core::coinbase::SCRIPTSIG_LEN + 1 }>;
+/// A text of the screens, long enough for the longest: a scriptsig, the welcome text.
+type Text = String<128>;
 
 const REFRESH_PERIOD: Duration = Duration::from_millis(200);
 /// How long a notification shows.
@@ -51,6 +51,9 @@ const LONG_PRESS: Duration = Duration::from_secs(2);
 /// Shown while the core power is cut.
 const OVERHEAT_MESSAGE: &str =
     "Power, frequency and fan settings have been changed. Go to the web interface to check them.";
+/// Shown until a Wi-Fi network is set.
+const WELCOME_MESSAGE: &str = "Welcome to your new Bitaxe! Connect to the configuration Wi-Fi and \
+                               connect the Bitaxe to your network.";
 
 /// A display the screens are drawn on.
 trait Panel {
@@ -82,6 +85,18 @@ struct View<'a> {
 type Line = (Text, bool);
 
 impl View<'_> {
+    /// The text of the QR code beside the connection screen's lines: the setup access point, while
+    /// it is on.
+    fn qr(&self) -> Option<String<48>> {
+        let s = self.status;
+        if self.screen != Screen::Connection || !s.ap_enabled || self.identify {
+            return None;
+        }
+        let mut text = String::new();
+        write!(text, "WIFI:S:{};;", s.ap_ssid).ok()?;
+        Some(text)
+    }
+
     /// The lines of the column screens: connection, overheat, URLs, statistics, mining, Wi-Fi.
     fn lines(&self) -> Vec<Line, 4> {
         let s = self.status;
@@ -96,12 +111,21 @@ impl View<'_> {
             Screen::Connection => {
                 let ssid =
                     crate::settings::with(|s| Text::try_from(s.ssid.as_str()).unwrap_or_default());
-                line(true, format_args!("Wi-Fi: {ssid}"));
-                line(true, format_args!("{}", s.wifi_status));
+                if ssid.is_empty() {
+                    line(true, format_args!("{WELCOME_MESSAGE}"));
+                } else {
+                    line(true, format_args!("Wi-Fi: {ssid}"));
+                    line(true, format_args!("{}", s.wifi_status));
+                }
                 if s.ap_enabled {
                     line(false, format_args!("Setup Wi-Fi:"));
                     line(true, format_args!("{}", s.ap_ssid));
                 }
+            }
+            Screen::AsicStatus => {
+                line(false, format_args!("ASIC STATUS:"));
+                let message = s.asic_status.as_deref().unwrap_or("");
+                line(true, format_args!("{message}"));
             }
             Screen::Overheat => {
                 line(false, format_args!("DEVICE OVERHEAT!"));
@@ -243,7 +267,12 @@ async fn run<P: Panel>(panel: &mut P, stack: Stack<'static>, mut button: Input<'
         let ip = ip_text(stack);
         let dt = (now - last_update).as_millis() as u32;
         last_update = now;
-        let next = carousel.update(dt, ip.is_some(), status.overheat);
+        let next = carousel.update(
+            dt,
+            ip.is_some(),
+            status.overheat,
+            status.asic_status.is_some(),
+        );
         if next != screen {
             screen = next;
             screen_start = now;
@@ -260,7 +289,7 @@ async fn run<P: Panel>(panel: &mut P, stack: Stack<'static>, mut button: Input<'
             counters = latest;
         }
         let notification = if status.mining_paused {
-            "||"
+            "▐▐"
         } else if (now - shown.1).as_millis() < NOTIFICATION_MS {
             shown.0
         } else {
