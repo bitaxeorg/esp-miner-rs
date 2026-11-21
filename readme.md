@@ -30,6 +30,11 @@ This is a proof of concept:
   theme, settings and update pages, rendered on the device with [htmx], and the AxeOS JSON API
   (`/api/system/info`, `PATCH /api/system`, pools, statistics, scoreboard, OTA update…), so the
   tools that monitor AxeOS miners work with it. Only clients on a private network may use it.
+- The pools speak Stratum V1, or Stratum V2 (the `stratumProtocol` of AxeOS) on a standard or an
+  extended channel, through the `no_std` crates of the [Stratum Reference Implementation][SRI]:
+  the Noise handshake checks the pool's certificate against its authority public key, with the
+  time from `pool.ntp.org`. `cargo run -p miner-core --example sv2_pool` is a small Stratum V2 pool
+  to test against.
 - Settings live in the NVS partition with the keys and types of AxeOS: switching between both
   firmwares keeps the WiFi, pools and tuning. WiFi credentials given at build time are only
   defaults.
@@ -57,7 +62,9 @@ This is a proof of concept:
     of the settings, drives the fan (automatic PID or manual), and on overheat cuts the power,
     then restarts 100 mV and 100 MHz lower once cooled down
   - `asic.rs`: brings the chain up with [bm13xx-rs], feeds it jobs and checks the nonces
-  - `pool.rs`: the Stratum v1 session, with the primary and fallback pools of the settings
+  - `pool.rs`: the pool session, Stratum V1 or V2 (`pool/sv2.rs`), with the primary and fallback
+    pools of the settings
+  - `clock.rs`: the time from an SNTP server, for the Stratum V2 certificate
   - `settings.rs`, `flash.rs`: the settings in the NVS partition, on the shared flash
   - `net.rs`: the WiFi station and setup access point, DHCP server, captive DNS and mDNS
   - `web.rs`: the web interface on [picoserve]: the JSON API (`web/api.rs`, `web/patch.rs`), the
@@ -69,8 +76,9 @@ This is a proof of concept:
     (`display/oled.rs`) or on the colour LCD over LCD_CAM and DMA (`display/lcd.rs`), with their
     fonts and images (`display/fonts.rs`, `display/images.rs`)
 - `miner-core/`: the hardware independent logic (block header, share check, job book, hashrate
-  meter, core voltage, fan PID, coinbase, pool entries, statistics, scoreboard, JSON, access
-  rules, units, screen carousel and text drawing), tested on the host
+  meter, core voltage, fan PID, coinbase, pool entries, the Stratum V2 client (`sv2`) and SNTP,
+  statistics, scoreboard, JSON, access rules, units, screen carousel and text drawing), tested on
+  the host
 - `tools/display-assets/`: converts the LVGL fonts and images of ESP-Miner's `main/` (and LVGL's
   `lv_font_unscii_16.c`) into the display assets of the firmware
 - drivers: [bm13xx-rs] for the ASICs, [tps546], [emc2101], [emc2103], [emc230x], [tmp1075],
@@ -136,6 +144,7 @@ no WiFi credentials: they start the setup access point.
 [esp-hal]:https://github.com/esp-rs/esp-hal
 [embassy]:https://github.com/embassy-rs/embassy
 [bm13xx-rs]:https://github.com/GPTechinno/bm13xx-rs
+[SRI]:https://github.com/stratum-mining/stratum
 [tps546]:https://github.com/GPTechinno/tps546
 [emc2101]:https://github.com/Georges760/emc2101-rs
 [emc2103]:https://github.com/Georges760/emc2103-rs

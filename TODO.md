@@ -27,8 +27,9 @@ labels and formats, not its exact look.
   Hashrate Registers card shows each domain's hashrate over the last 5 s with a marker at its
   nominal rate, not AxeOS's sparkline history. The chart is drawn on the device: hashrate and
   ASIC temperature only, no series choice, no tooltips.
-- **Pool**: one pool saved at a time, Stratum V1 fields only (no SV2, TLS or certificate), no
-  quick links to the pool dashboards.
+- **Pool**: one pool saved at a time, no TLS or certificate, no quick links to the pool
+  dashboards. Stratum V2: the chips roll the version of a job whose pool forbids it (only
+  logged); AxeOS sends that job without version rolling.
 - **Update**: no GitHub release check, no firmware integrity check against the release (the
   checksum endpoint exists), no custom web UI (`useCustomWWW`, `OTAWWW`: the pages are part of the
   firmware).
@@ -49,7 +50,8 @@ labels and formats, not its exact look.
 - **Hostname**: applied at the next restart; AxeOS applies it at once.
 - **Frequency and voltage** changes apply at once by bringing the chips up again, or by powering
   them again for the voltage; AxeOS changes them without interrupting.
-- **NTP** time sync: the setting is kept, not used.
+- **NTP** time sync: the setting is kept, not used; the time is only taken from `pool.ntp.org`
+  for a Stratum V2 pool with an authority public key.
 
 ### Network
 
