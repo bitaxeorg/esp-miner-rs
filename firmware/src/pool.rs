@@ -1,4 +1,7 @@
-//! Stratum v1 pool session: owns the client, hands jobs to the ASIC task and submits its shares.
+//! Pool session, Stratum V1 or V2 (`sv2`): owns the client, hands jobs to the ASIC task and
+//! submits its shares.
+
+mod sv2;
 
 use core::{cell::Cell, convert::Infallible, net::Ipv4Addr, str::FromStr};
 
@@ -71,6 +74,15 @@ enum SessionError {
     Credentials,
     /// The pool settings changed.
     Reconfigured,
+    Sv2(miner_core::sv2::Error),
+    /// The Stratum V2 authority key isn't a base58 public key.
+    AuthorityKey,
+    /// The Stratum V2 pool requires an authority key, and has none.
+    NoAuthorityKey,
+    /// No time to check the Stratum V2 pool certificate against.
+    NoTime,
+    /// The pool asked to connect again.
+    Reconnect,
 }
 
 impl defmt::Format for SessionError {
@@ -82,6 +94,13 @@ impl defmt::Format for SessionError {
             Self::Credentials => defmt::write!(fmt, "user or password too long"),
             Self::Reconfigured => defmt::write!(fmt, "pool settings changed"),
             Self::Stratum(e) => defmt::write!(fmt, "stratum error: {}", e),
+            Self::Sv2(e) => defmt::write!(fmt, "stratum v2 error: {}", e),
+            Self::AuthorityKey => defmt::write!(fmt, "invalid authority public key"),
+            Self::NoAuthorityKey => {
+                defmt::write!(fmt, "authentication required, no authority public key")
+            }
+            Self::NoTime => defmt::write!(fmt, "no time to check the pool certificate"),
+            Self::Reconnect => defmt::write!(fmt, "the pool asked to reconnect"),
         }
     }
 }
@@ -95,6 +114,11 @@ impl core::fmt::Display for SessionError {
             Self::Stratum(e) => write!(f, "stratum error: {e:?}"),
             Self::Credentials => f.write_str("user or password too long"),
             Self::Reconfigured => f.write_str("pool settings changed"),
+            Self::Sv2(e) => write!(f, "stratum v2 error: {e:?}"),
+            Self::AuthorityKey => f.write_str("invalid authority public key"),
+            Self::NoAuthorityKey => f.write_str("authentication required, no authority public key"),
+            Self::NoTime => f.write_str("no time to check the pool certificate"),
+            Self::Reconnect => f.write_str("the pool asked to reconnect"),
         }
     }
 }
@@ -156,14 +180,12 @@ pub async fn pool_task(
             }
         });
         let mut authorized = false;
-        let Err(e) = session(
-            stack,
-            &mut rx_buf[..],
-            &mut tx_buf[..],
-            &pool,
-            &mut authorized,
-        )
-        .await;
+        let (rx, tx) = (&mut rx_buf[..], &mut tx_buf[..]);
+        let Err(e) = if pool.is_sv2() {
+            sv2::session(stack, rx, tx, &pool, &mut authorized).await
+        } else {
+            session(stack, rx, tx, &pool, &mut authorized).await
+        };
         wlog!(Error, "pool", "session ended: {}", e);
         status::update(|s| s.pool_connected = false);
         if fallback || authorized {
@@ -179,18 +201,13 @@ pub async fn pool_task(
     }
 }
 
-/// Runs one session, until the connection fails or the client can't send. A pool message the
-/// client can't parse is dropped, and the session goes on.
-async fn session(
-    stack: Stack<'_>,
-    rx_buf: &mut [u8],
-    tx_buf: &mut [u8],
+/// Resolves the pool host and opens a TCP connection to it.
+async fn connect<'a>(
+    stack: Stack<'a>,
+    rx_buf: &'a mut [u8],
+    tx_buf: &'a mut [u8],
     pool: &PoolConfig,
-    authorized: &mut bool,
-) -> Result<Infallible, SessionError> {
-    let user = String::<64>::try_from(pool.user.as_str()).map_err(|_| SessionError::Credentials)?;
-    let password =
-        String::<64>::try_from(pool.password.as_str()).map_err(|_| SessionError::Credentials)?;
+) -> Result<TcpSocket<'a>, SessionError> {
     let address = match Ipv4Addr::from_str(pool.host()) {
         Ok(address) => address,
         Err(_) => stack
@@ -220,8 +237,24 @@ async fn session(
         .await
         .map_err(SessionError::Connect)?;
     info!("connected!");
+    Ok(socket)
+}
 
+/// Runs one session, until the connection fails or the client can't send. A pool message the
+/// client can't parse is dropped, and the session goes on.
+async fn session(
+    stack: Stack<'_>,
+    rx_buf: &mut [u8],
+    tx_buf: &mut [u8],
+    pool: &PoolConfig,
+    authorized: &mut bool,
+) -> Result<Infallible, SessionError> {
+    let user = String::<64>::try_from(pool.user.as_str()).map_err(|_| SessionError::Credentials)?;
+    let password =
+        String::<64>::try_from(pool.password.as_str()).map_err(|_| SessionError::Credentials)?;
+    let socket = connect(stack, rx_buf, tx_buf, pool).await?;
     let mut client = StratumClient::new(socket);
+
     client.enable_software_rolling(false, true, false);
     client
         .send_configure(Extensions {

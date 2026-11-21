@@ -1374,7 +1374,11 @@ pub async fn pool() -> Reply {
             );
             match p {
                 Some(p) => {
-                    let _ = write!(out, "<span class='badge blue'>Stratum V1</span>");
+                    let _ = write!(
+                        out,
+                        "<span class='badge blue'>Stratum {}</span>",
+                        if p.is_sv2() { "V2" } else { "V1" }
+                    );
                     if primary {
                         out.push_str("<span class='badge green'>Primary</span>");
                     }
@@ -1400,20 +1404,42 @@ pub async fn pool() -> Reply {
                     p.extranonce_subscribe,
                 )
             });
+            let (sv2, standard, key, require_auth) =
+                p.as_ref().map_or((false, false, "", false), |p| {
+                    (
+                        p.is_sv2(),
+                        p.sv2_channel_type == "standard",
+                        p.sv2_authority_key.as_str(),
+                        p.sv2_require_auth,
+                    )
+                });
             let _ = write!(
                 out,
                 "<form hx-post='/pool/{i}' hx-swap='none'><div class='grid grid-2'>\
+                 <div class='field'><label>Protocol</label><select name='stratumProtocol'>\
+                 <option value='SV1'{}>Stratum V1</option><option value='SV2'{}>Stratum V2</option></select></div>\
                  <div class='field'><label>Stratum Host</label><input class='input-text' name='stratumURL' required value='{}'></div>\
                  <div class='field'><label>Stratum Port</label><input class='input-text' type='number' name='stratumPort' min='1' max='65535' required value='{port}'></div>\
                  <div class='field'><label>User</label><input class='input-text' name='stratumUser' required value='{}'></div>\
                  <div class='field'><label>Password</label><input class='input-text' type='password' name='stratumPassword' value='{}'></div>\
                  <div class='field'><label>Suggested Difficulty</label><input class='input-text' type='number' name='stratumSuggestedDifficulty' min='0' value='{diff}'></div>\
                  </div><label class='checkbox'><input type='checkbox' name='stratumExtranonceSubscribe' value='true'{}>Enable Extranonce Subscribe</label>\
+                 <h4>Stratum V2</h4><div class='grid grid-2'>\
+                 <div class='field'><label>Channel Type</label><select name='stratumV2ChannelType'>\
+                 <option value='extended'{}>Extended</option><option value='standard'{}>Standard</option></select></div>\
+                 <div class='field'><label>Authority Public Key</label><input class='input-text' name='stratumV2AuthorityPubkey' maxlength='128' value='{}'></div>\
+                 </div><label class='checkbox'><input type='checkbox' name='stratumV2RequireAuth' value='true'{}>Require Authentication</label>\
                  <div class='buttons'><button class='btn' type='submit'>Save</button>",
+                selected(!sv2),
+                selected(sv2),
                 Esc(url),
                 Esc(user),
                 if p.is_some() { HIDDEN_PASSWORD } else { "x" },
-                checked(xn)
+                checked(xn),
+                selected(!standard),
+                selected(standard),
+                Esc(key),
+                checked(require_auth)
             );
             if p.is_some() {
                 let _ = write!(
@@ -1491,6 +1517,14 @@ pub struct PoolForm {
     difficulty: Option<u64>,
     #[serde(rename = "stratumExtranonceSubscribe")]
     extranonce: Option<bool>,
+    #[serde(rename = "stratumProtocol")]
+    protocol: Option<Text<3>>,
+    #[serde(rename = "stratumV2ChannelType")]
+    channel: Option<Text<16>>,
+    #[serde(rename = "stratumV2AuthorityPubkey")]
+    pubkey: Option<Text<128>>,
+    #[serde(rename = "stratumV2RequireAuth")]
+    require_auth: Option<bool>,
 }
 
 pub async fn save_pool(index: usize, Form(f): Form<PoolForm>) -> Reply {
@@ -1509,6 +1543,16 @@ pub async fn save_pool(index: usize, Form(f): Form<PoolForm>) -> Reply {
             .field_str("stratumPassword", f.password.as_deref().unwrap_or("x"))
             .field_num("stratumSuggestedDifficulty", f.difficulty.unwrap_or(0))
             .field_bool("stratumExtranonceSubscribe", f.extranonce.unwrap_or(false))
+            .field_str("stratumProtocol", f.protocol.as_deref().unwrap_or("SV1"))
+            .field_str(
+                "stratumV2ChannelType",
+                f.channel.as_deref().unwrap_or("extended"),
+            )
+            .field_str(
+                "stratumV2AuthorityPubkey",
+                f.pubkey.as_deref().unwrap_or("").trim(),
+            )
+            .field_bool("stratumV2RequireAuth", f.require_auth.unwrap_or(false))
             .end_object()
             .end_array();
         let _ = j.finish();

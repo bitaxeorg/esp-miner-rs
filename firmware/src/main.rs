@@ -9,6 +9,7 @@ extern crate alloc;
 
 mod asic;
 mod board;
+mod clock;
 mod cooling;
 #[cfg(any(feature = "display-oled", feature = "display-st7789"))]
 mod display;
