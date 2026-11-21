@@ -202,8 +202,14 @@ pub fn font(src: &str) -> Result<Font, String> {
 }
 
 /// A monochrome image of a little-endian RGB565 one: rows of `width` bits, most significant bit
-/// first, each row starting on a byte, set where the pixel isn't white.
-pub fn mono(rgb565_le: &[u8], width: usize, height: usize) -> Result<Vec<u8>, String> {
+/// first, each row starting on a byte, set where the pixel is white with `set_white`, else where it
+/// isn't.
+pub fn mono(
+    rgb565_le: &[u8],
+    width: usize,
+    height: usize,
+    set_white: bool,
+) -> Result<Vec<u8>, String> {
     if rgb565_le.len() < width * height * 2 {
         return Err(format!("{} bytes for {width} × {height}", rgb565_le.len()));
     }
@@ -212,7 +218,7 @@ pub fn mono(rgb565_le: &[u8], width: usize, height: usize) -> Result<Vec<u8>, St
     for y in 0..height {
         for x in 0..width {
             let i = (y * width + x) * 2;
-            if u16::from_le_bytes([rgb565_le[i], rgb565_le[i + 1]]) != 0xffff {
+            if (u16::from_le_bytes([rgb565_le[i], rgb565_le[i + 1]]) == 0xffff) == set_white {
                 out[y * stride + x / 8] |= 0x80 >> (x % 8);
             }
         }
@@ -302,10 +308,11 @@ const lv_font_t font = {
     }
 
     #[test]
-    fn mono_images_set_the_non_white_pixels() {
+    fn mono_images_set_the_chosen_pixels() {
         // 3 × 2: white, black, white / black, white, white
         let px = [0xff, 0xff, 0, 0, 0xff, 0xff, 0, 0, 0xff, 0xff, 0xff, 0xff];
-        assert_eq!(mono(&px, 3, 2).unwrap(), [0b0100_0000, 0b1000_0000]);
-        assert!(mono(&px[..10], 3, 2).is_err());
+        assert_eq!(mono(&px, 3, 2, false).unwrap(), [0b0100_0000, 0b1000_0000]);
+        assert_eq!(mono(&px, 3, 2, true).unwrap(), [0b1010_0000, 0b0110_0000]);
+        assert!(mono(&px[..10], 3, 2, false).is_err());
     }
 }

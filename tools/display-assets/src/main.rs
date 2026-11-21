@@ -100,10 +100,10 @@ fn font_code(spec: &FontSpec, font: &lvgl::Font) -> String {
 }
 
 /// The Rust code of a monochrome image.
-fn mono_code(name: &str, width: usize, height: usize, data: &[u8]) -> String {
+fn mono_code(name: &str, width: usize, height: usize, data: &[u8], cfg: &str) -> String {
     let bytes: Vec<String> = data.iter().map(|b| format!("0x{b:02x}")).collect();
     format!(
-        "{OLED}\nstatic {name}_DATA: [u8; {}] = [{}];\n{OLED}\npub static {name}: MonoImage = \
+        "{cfg}\nstatic {name}_DATA: [u8; {}] = [{}];\n{cfg}\npub static {name}: MonoImage = \
          MonoImage {{\n    width: {width},\n    height: {height},\n    data: &{name}_DATA,\n}};\n\n",
         bytes.len(),
         bytes.join(", ")
@@ -184,14 +184,16 @@ fn run(main: &Path, unscii: &Path, out: &Path) -> Result<(), String> {
 
     let logo = read(&main.join("logo.c"))?;
     let mut images =
-        format!("//! Images of the status screens.\n\n{OLED}\nuse miner_core::ui::MonoImage;\n\n");
-    for (array, name, width, height) in [
-        ("bitaxe_logo_map", "BITAXE_LOGO", 77, 30),
-        ("osmu_logo_map", "OSMU_LOGO", 125, 27),
+        format!("//! Images of the status screens.\n\n{ANY}\nuse miner_core::ui::MonoImage;\n\n");
+    // the logos are dark on white, the identify text white on black
+    for (array, name, width, height, set_white, cfg) in [
+        ("bitaxe_logo_map", "BITAXE_LOGO", 77, 30, false, OLED),
+        ("osmu_logo_map", "OSMU_LOGO", 125, 27, false, OLED),
+        ("identify_text_map", "IDENTIFY", 44, 30, true, ANY),
     ] {
-        let data = lvgl::mono(&lvgl::bytes(&logo, array)?, width, height)
+        let data = lvgl::mono(&lvgl::bytes(&logo, array)?, width, height, set_white)
             .map_err(|e| format!("{array}: {e}"))?;
-        images.push_str(&mono_code(name, width, height, &data));
+        images.push_str(&mono_code(name, width, height, &data, cfg));
     }
     let _ = writeln!(
         images,
